@@ -1,0 +1,695 @@
+openapi: 3.1.0
+info:
+  title: LIS Target API
+  version: 0.2.0-target
+  summary: Canonical target contract for the LIS MVP
+  description: >
+    Design-level API contract imported from the starter pack. This target extends the
+    currently implemented slice with observations, reports, audit search, and device ingest.
+servers:
+  - url: /
+tags:
+  - name: orders
+  - name: specimens
+  - name: tasks
+  - name: observations
+  - name: reports
+  - name: audit
+  - name: devices
+paths:
+  /api/v1/orders:
+    post:
+      tags: [orders]
+      summary: Create an order
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+    get:
+      tags: [orders]
+      summary: Search orders
+      operationId: searchOrders
+      parameters:
+        - in: query
+          name: requisition_no
+          schema: { type: string }
+        - in: query
+          name: patient_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        "200":
+          description: Matching orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Order"
+  /api/v1/orders/{order_id}:
+    get:
+      tags: [orders]
+      summary: Read one order
+      operationId: getOrder
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+  /api/v1/specimens/accession:
+    post:
+      tags: [specimens]
+      summary: Accession a specimen
+      operationId: accessionSpecimen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessionSpecimenRequest"
+      responses:
+        "201":
+          description: Specimen created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Specimen"
+  /api/v1/specimens/{specimen_id}/collect:
+    post:
+      tags: [specimens]
+      summary: Mark a specimen as collected
+      operationId: collectSpecimen
+      parameters:
+        - $ref: "#/components/parameters/SpecimenId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CollectSpecimenRequest"
+      responses:
+        "200":
+          description: Specimen updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Specimen"
+  /api/v1/specimens/{specimen_id}/receive:
+    post:
+      tags: [specimens]
+      summary: Mark a specimen as received
+      operationId: receiveSpecimen
+      parameters:
+        - $ref: "#/components/parameters/SpecimenId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiveSpecimenRequest"
+      responses:
+        "200":
+          description: Specimen updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Specimen"
+  /api/v1/specimens/{specimen_id}/accept:
+    post:
+      tags: [specimens]
+      summary: Accept a specimen for processing
+      operationId: acceptSpecimen
+      parameters:
+        - $ref: "#/components/parameters/SpecimenId"
+      responses:
+        "200":
+          description: Specimen updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Specimen"
+  /api/v1/specimens/{specimen_id}/reject:
+    post:
+      tags: [specimens]
+      summary: Reject a specimen
+      operationId: rejectSpecimen
+      parameters:
+        - $ref: "#/components/parameters/SpecimenId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectSpecimenRequest"
+      responses:
+        "200":
+          description: Specimen updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Specimen"
+  /api/v1/specimens/{specimen_id}/trace:
+    get:
+      tags: [specimens]
+      summary: Read specimen trace events
+      operationId: getSpecimenTrace
+      parameters:
+        - $ref: "#/components/parameters/SpecimenId"
+      responses:
+        "200":
+          description: Trace response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpecimenTrace"
+  /api/v1/tasks:
+    post:
+      tags: [tasks]
+      summary: Create a work task
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskWork"
+    get:
+      tags: [tasks]
+      summary: Search tasks
+      operationId: searchTasks
+      parameters:
+        - in: query
+          name: queue
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        "200":
+          description: Matching tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TaskWork"
+  /api/v1/tasks/{task_id}/claim:
+    post:
+      tags: [tasks]
+      summary: Claim a task
+      operationId: claimTask
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [owner_user_id]
+              properties:
+                owner_user_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskWork"
+  /api/v1/tasks/{task_id}/start:
+    post:
+      tags: [tasks]
+      summary: Start a task
+      operationId: startTask
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskWork"
+  /api/v1/tasks/{task_id}/complete:
+    post:
+      tags: [tasks]
+      summary: Complete a task
+      operationId: completeTask
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskWork"
+  /api/v1/observations/manual:
+    post:
+      tags: [observations]
+      summary: Create a manual observation
+      operationId: createManualObservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateManualObservationRequest"
+      responses:
+        "201":
+          description: Observation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Observation"
+  /api/v1/observations/{observation_id}/technical-verify:
+    post:
+      tags: [observations]
+      summary: Perform technical verification on an observation
+      operationId: technicalVerifyObservation
+      parameters:
+        - $ref: "#/components/parameters/ObservationId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes: { type: string }
+      responses:
+        "200":
+          description: Observation updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Observation"
+  /api/v1/observations/{observation_id}/correct:
+    post:
+      tags: [observations]
+      summary: Correct an observation
+      operationId: correctObservation
+      parameters:
+        - $ref: "#/components/parameters/ObservationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+                replacement:
+                  $ref: "#/components/schemas/CreateManualObservationRequest"
+      responses:
+        "200":
+          description: Observation updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Observation"
+  /api/v1/devices/{device_id}/ingest:
+    post:
+      tags: [devices]
+      summary: Ingest a raw device payload
+      operationId: ingestDevicePayload
+      parameters:
+        - in: path
+          name: device_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        "202":
+          description: Payload accepted
+  /api/v1/reports/generate:
+    post:
+      tags: [reports]
+      summary: Generate a diagnostic report
+      operationId: generateReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id]
+              properties:
+                order_id: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Report created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticReport"
+  /api/v1/reports/{report_id}:
+    get:
+      tags: [reports]
+      summary: Read one report
+      operationId: getReport
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      responses:
+        "200":
+          description: Report detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticReport"
+  /api/v1/reports/{report_id}/authorize:
+    post:
+      tags: [reports]
+      summary: Authorize a report
+      operationId: authorizeReport
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signed_by_user_id]
+              properties:
+                signed_by_user_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Report updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticReport"
+  /api/v1/reports/{report_id}/amend:
+    post:
+      tags: [reports]
+      summary: Amend a report
+      operationId: amendReport
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+                conclusion_text: { type: string }
+      responses:
+        "200":
+          description: Report updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticReport"
+  /api/v1/audit:
+    get:
+      tags: [audit]
+      summary: Search audit events
+      operationId: searchAudit
+      parameters:
+        - in: query
+          name: entity_type
+          schema: { type: string }
+        - in: query
+          name: entity_id
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Matching audit events
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEvent"
+components:
+  parameters:
+    OrderId:
+      in: path
+      name: order_id
+      required: true
+      schema: { type: string, format: uuid }
+    SpecimenId:
+      in: path
+      name: specimen_id
+      required: true
+      schema: { type: string, format: uuid }
+    TaskId:
+      in: path
+      name: task_id
+      required: true
+      schema: { type: string, format: uuid }
+    ObservationId:
+      in: path
+      name: observation_id
+      required: true
+      schema: { type: string, format: uuid }
+    ReportId:
+      in: path
+      name: report_id
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required: [patient_id, source_system, priority, ordered_at, items]
+      properties:
+        patient_id: { type: string, format: uuid }
+        encounter_case_id: { type: string, format: uuid }
+        source_system: { type: string }
+        placer_order_no: { type: string }
+        priority:
+          type: string
+          enum: [routine, urgent, asap, stat]
+        clinical_info: { type: string }
+        ordered_at: { type: string, format: date-time }
+        requested_by_practitioner_role_id: { type: string, format: uuid }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [line_no, test_catalog_id]
+            properties:
+              line_no: { type: integer }
+              test_catalog_id: { type: string, format: uuid }
+              requested_specimen_type_code: { type: string }
+              priority:
+                type: string
+                enum: [routine, urgent, asap, stat]
+              aoe_payload: { type: object }
+    Order:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        requisition_no: { type: string }
+        patient_id: { type: string, format: uuid }
+        status: { type: string }
+        priority: { type: string }
+        ordered_at: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+    OrderItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        line_no: { type: integer }
+        test_catalog_id: { type: string, format: uuid }
+        status: { type: string }
+        priority: { type: string }
+    AccessionSpecimenRequest:
+      type: object
+      required: [order_id, patient_id, specimen_type_code]
+      properties:
+        order_id: { type: string, format: uuid }
+        patient_id: { type: string, format: uuid }
+        specimen_type_code: { type: string }
+        parent_specimen_id: { type: string, format: uuid }
+        source_location_id: { type: string, format: uuid }
+        containers:
+          type: array
+          items:
+            type: object
+            required: [barcode, container_type_code]
+            properties:
+              barcode: { type: string }
+              container_type_code: { type: string }
+    CollectSpecimenRequest:
+      type: object
+      required: [collected_at]
+      properties:
+        collected_at: { type: string, format: date-time }
+        collected_by_practitioner_role_id: { type: string, format: uuid }
+        collection_site_code: { type: string }
+    ReceiveSpecimenRequest:
+      type: object
+      required: [received_at]
+      properties:
+        received_at: { type: string, format: date-time }
+    RejectSpecimenRequest:
+      type: object
+      required: [reason_code]
+      properties:
+        reason_code: { type: string }
+        notes: { type: string }
+    Specimen:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        accession_no: { type: string }
+        order_id: { type: string, format: uuid }
+        patient_id: { type: string, format: uuid }
+        specimen_type_code: { type: string }
+        status: { type: string }
+        collected_at: { type: string, format: date-time }
+        received_at: { type: string, format: date-time }
+        accepted_at: { type: string, format: date-time }
+    SpecimenEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        event_type: { type: string }
+        event_at: { type: string, format: date-time }
+        actor_user_id: { type: string, format: uuid }
+        payload: { type: object }
+    SpecimenTrace:
+      type: object
+      required: [specimen, events]
+      properties:
+        specimen:
+          $ref: "#/components/schemas/Specimen"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpecimenEvent"
+    CreateTaskRequest:
+      type: object
+      required: [focus_type, focus_id, queue_code, status, authored_on]
+      properties:
+        group_identifier: { type: string }
+        based_on_order_item_id: { type: string, format: uuid }
+        focus_type: { type: string }
+        focus_id: { type: string, format: uuid }
+        queue_code: { type: string }
+        status: { type: string }
+        business_status: { type: string }
+        device_id: { type: string, format: uuid }
+        authored_on: { type: string, format: date-time }
+    TaskWork:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        group_identifier: { type: string }
+        queue_code: { type: string }
+        status: { type: string }
+        business_status: { type: string }
+        owner_user_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+    CreateManualObservationRequest:
+      type: object
+      required: [order_item_id, code_local, status, value_type]
+      properties:
+        order_item_id: { type: string, format: uuid }
+        specimen_id: { type: string, format: uuid }
+        code_local: { type: string }
+        code_loinc: { type: string }
+        status: { type: string }
+        value_type:
+          type: string
+          enum: [quantity, text, coded, boolean, range, attachment]
+        value_num: { type: number }
+        value_text: { type: string }
+        value_boolean: { type: boolean }
+        value_code_system: { type: string }
+        value_code: { type: string }
+        unit_ucum: { type: string }
+        interpretation_code: { type: string }
+        abnormal_flag: { type: string }
+        method_code: { type: string }
+        device_id: { type: string, format: uuid }
+        effective_at: { type: string, format: date-time }
+    Observation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        order_item_id: { type: string, format: uuid }
+        specimen_id: { type: string, format: uuid }
+        code_local: { type: string }
+        code_loinc: { type: string }
+        status: { type: string }
+        value_type: { type: string }
+        value_num: { type: number }
+        value_text: { type: string }
+        value_boolean: { type: boolean }
+        unit_ucum: { type: string }
+        interpretation_code: { type: string }
+        abnormal_flag: { type: string }
+        effective_at: { type: string, format: date-time }
+    DiagnosticReport:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        report_no: { type: string }
+        order_id: { type: string, format: uuid }
+        patient_id: { type: string, format: uuid }
+        status: { type: string }
+        issued_at: { type: string, format: date-time }
+        conclusion_text: { type: string }
+        current_version_no: { type: integer }
+    AuditEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        occurred_at: { type: string, format: date-time }
+        actor_user_id: { type: string, format: uuid }
+        action_code: { type: string }
+        entity_type: { type: string }
+        entity_id: { type: string, format: uuid }
+        outcome_code: { type: string }
+        details: { type: object }

@@ -1,888 +1,5349 @@
 openapi: 3.1.0
 info:
-  title: LIS Internal API
-  version: 0.1.0
-  summary: Internal operational contract for the first LIS workflow slice
-  description: >
-    Contract-first API for the starter LIS v1 implementation. This surface focuses on
-    order intake, specimen lifecycle, and work queue orchestration.
-servers:
-  - url: /
-tags:
-  - name: system
-  - name: orders
-  - name: specimens
-  - name: tasks
+  title: LIS Core API
+  summary: Starter modular monolith for a laboratory information system
+  description: Internal API with working persistence for auth, master data, orders,
+    specimen lifecycle, task orchestration, observations, reports, audit, provenance,
+    device registry, HL7 v2 integrations, device gateway, autoverification, ASTM-style
+    drivers, and a read/search FHIR facade.
+  version: 0.7.0
 paths:
   /health:
     get:
-      tags: [system]
+      tags:
+      - system
       summary: Read service health
-      operationId: getHealth
+      operationId: get_health_health_get
       responses:
-        "200":
-          description: Service health response
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthResponse"
+                $ref: '#/components/schemas/HealthResponse'
+  /fhir/R4/metadata:
+    get:
+      tags:
+      - fhir
+      summary: Get Metadata
+      operationId: get_metadata_fhir_R4_metadata_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Get Metadata Fhir R4 Metadata Get
+  /fhir/R4/Patient:
+    get:
+      tags:
+      - fhir
+      summary: Search Patients
+      operationId: search_patients_fhir_R4_Patient_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: identifier
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identifier
+      - name: family
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Family
+      - name: _id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: ' Id'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Search Patients Fhir R4 Patient Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/Patient/{patient_id}:
+    get:
+      tags:
+      - fhir
+      summary: Read Patient
+      operationId: read_patient_fhir_R4_Patient__patient_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Patient Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Read Patient Fhir R4 Patient  Patient Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/ServiceRequest:
+    get:
+      tags:
+      - fhir
+      summary: Search Service Requests
+      operationId: search_service_requests_fhir_R4_ServiceRequest_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: patient
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Patient
+      - name: identifier
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identifier
+      - name: requisition
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requisition
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: _id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: ' Id'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Search Service Requests Fhir R4 Servicerequest Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/ServiceRequest/{service_request_id}:
+    get:
+      tags:
+      - fhir
+      summary: Read Service Request
+      operationId: read_service_request_fhir_R4_ServiceRequest__service_request_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: service_request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Service Request Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Read Service Request Fhir R4 Servicerequest  Service
+                  Request Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/Specimen:
+    get:
+      tags:
+      - fhir
+      summary: Search Specimens
+      operationId: search_specimens_fhir_R4_Specimen_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: patient
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Patient
+      - name: identifier
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identifier
+      - name: accession
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Accession
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: _id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: ' Id'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Search Specimens Fhir R4 Specimen Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/Specimen/{specimen_id}:
+    get:
+      tags:
+      - fhir
+      summary: Read Specimen
+      operationId: read_specimen_fhir_R4_Specimen__specimen_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: specimen_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Specimen Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Read Specimen Fhir R4 Specimen  Specimen Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/Task:
+    get:
+      tags:
+      - fhir
+      summary: Search Tasks
+      operationId: search_tasks_fhir_R4_Task_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: focus
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Focus
+      - name: code
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code
+      - name: patient
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Patient
+      - name: _id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: ' Id'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Search Tasks Fhir R4 Task Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/Task/{task_id}:
+    get:
+      tags:
+      - fhir
+      summary: Read Task
+      operationId: read_task_fhir_R4_Task__task_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Task Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Read Task Fhir R4 Task  Task Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/Observation:
+    get:
+      tags:
+      - fhir
+      summary: Search Observations
+      operationId: search_observations_fhir_R4_Observation_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: patient
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Patient
+      - name: specimen
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Specimen
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: code
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code
+      - name: based-on
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Based-On
+      - name: _id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: ' Id'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Search Observations Fhir R4 Observation Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/Observation/{observation_id}:
+    get:
+      tags:
+      - fhir
+      summary: Read Observation
+      operationId: read_observation_fhir_R4_Observation__observation_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: observation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Observation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Read Observation Fhir R4 Observation  Observation
+                  Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/DiagnosticReport:
+    get:
+      tags:
+      - fhir
+      summary: Search Diagnostic Reports
+      operationId: search_diagnostic_reports_fhir_R4_DiagnosticReport_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: patient
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Patient
+      - name: based-on
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Based-On
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: _id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: ' Id'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Search Diagnostic Reports Fhir R4 Diagnosticreport
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/DiagnosticReport/{report_id}:
+    get:
+      tags:
+      - fhir
+      summary: Read Diagnostic Report
+      operationId: read_diagnostic_report_fhir_R4_DiagnosticReport__report_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: report_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Report Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Read Diagnostic Report Fhir R4 Diagnosticreport  Report
+                  Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/AuditEvent:
+    get:
+      tags:
+      - fhir
+      summary: Search Audit Events
+      operationId: search_audit_events_fhir_R4_AuditEvent_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: entity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity
+      - name: _id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: ' Id'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Search Audit Events Fhir R4 Auditevent Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/AuditEvent/{audit_event_id}:
+    get:
+      tags:
+      - fhir
+      summary: Read Audit Event
+      operationId: read_audit_event_fhir_R4_AuditEvent__audit_event_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_event_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Event Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Read Audit Event Fhir R4 Auditevent  Audit Event Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/Provenance:
+    get:
+      tags:
+      - fhir
+      summary: Search Provenance
+      operationId: search_provenance_fhir_R4_Provenance_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: target
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target
+      - name: _id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: ' Id'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Search Provenance Fhir R4 Provenance Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fhir/R4/Provenance/{provenance_id}:
+    get:
+      tags:
+      - fhir
+      summary: Read Provenance
+      operationId: read_provenance_fhir_R4_Provenance__provenance_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: provenance_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Provenance Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Read Provenance Fhir R4 Provenance  Provenance Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/bootstrap-admin:
+    post:
+      tags:
+      - auth
+      summary: Bootstrap Admin
+      operationId: bootstrap_admin_api_v1_auth_bootstrap_admin_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BootstrapAdminRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/login:
+    post:
+      tags:
+      - auth
+      summary: Login
+      operationId: login_api_v1_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/me:
+    get:
+      tags:
+      - auth
+      summary: Read Me
+      operationId: read_me_api_v1_auth_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummary'
+      security:
+      - HTTPBearer: []
+  /api/v1/autoverification/rules:
+    post:
+      tags:
+      - autoverification
+      summary: Create Rule
+      operationId: create_rule_api_v1_autoverification_rules_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutoverificationRuleCreateRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoverificationRuleSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - autoverification
+      summary: List Rules
+      operationId: list_rules_api_v1_autoverification_rules_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: active
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Active
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AutoverificationRuleSummary'
+                title: Response List Rules Api V1 Autoverification Rules Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/autoverification/rules/{rule_id}:
+    get:
+      tags:
+      - autoverification
+      summary: Get Rule
+      operationId: get_rule_api_v1_autoverification_rules__rule_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: rule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Rule Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoverificationRuleSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/autoverification/observations/{observation_id}/evaluate:
+    post:
+      tags:
+      - autoverification
+      summary: Evaluate Observation
+      operationId: evaluate_observation_api_v1_autoverification_observations__observation_id__evaluate_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: observation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Observation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoverificationEvaluateResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/autoverification/observations/{observation_id}/apply:
+    post:
+      tags:
+      - autoverification
+      summary: Apply Autoverification
+      operationId: apply_autoverification_api_v1_autoverification_observations__observation_id__apply_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: observation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Observation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoverificationApplyResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/autoverification/observations/{observation_id}/runs:
+    get:
+      tags:
+      - autoverification
+      summary: List Runs
+      operationId: list_runs_api_v1_autoverification_observations__observation_id__runs_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: observation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Observation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AutoverificationRunSummary'
+                title: Response List Runs Api V1 Autoverification Observations  Observation
+                  Id  Runs Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/patients:
+    post:
+      tags:
+      - patients
+      summary: Create Patient
+      operationId: create_patient_api_v1_patients_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientCreateRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - patients
+      summary: List Patients
+      operationId: list_patients_api_v1_patients_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: mrn
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mrn
+      - name: family_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Family Name
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PatientSummary'
+                title: Response List Patients Api V1 Patients Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/patients/{patient_id}:
+    get:
+      tags:
+      - patients
+      summary: Get Patient
+      operationId: get_patient_api_v1_patients__patient_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Patient Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/test-catalog:
+    post:
+      tags:
+      - catalog
+      summary: Create Test Catalog Item
+      operationId: create_test_catalog_item_api_v1_test_catalog_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestCatalogCreateRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestCatalogSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - catalog
+      summary: List Catalog
+      operationId: list_catalog_api_v1_test_catalog_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: local_code
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Local Code
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Q
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TestCatalogSummary'
+                title: Response List Catalog Api V1 Test Catalog Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/test-catalog/{catalog_id}:
+    get:
+      tags:
+      - catalog
+      summary: Get Catalog Item
+      operationId: get_catalog_item_api_v1_test_catalog__catalog_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: catalog_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Catalog Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestCatalogSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/devices:
+    post:
+      tags:
+      - devices
+      summary: Create Device
+      operationId: create_device_api_v1_devices_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceCreateRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - devices
+      summary: List Devices
+      operationId: list_devices_api_v1_devices_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: active
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Active
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DeviceSummary'
+                title: Response List Devices Api V1 Devices Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/devices/{device_id}:
+    get:
+      tags:
+      - devices
+      summary: Get Device
+      operationId: get_device_api_v1_devices__device_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/devices/{device_id}/mappings:
+    post:
+      tags:
+      - devices
+      summary: Create Device Mapping
+      operationId: create_device_mapping_api_v1_devices__device_id__mappings_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceTestMapCreateRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceTestMapSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - devices
+      summary: List Device Mappings
+      operationId: list_device_mappings_api_v1_devices__device_id__mappings_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DeviceTestMapSummary'
+                title: Response List Device Mappings Api V1 Devices  Device Id  Mappings
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/integrations/messages:
+    get:
+      tags:
+      - integrations
+      summary: List Interface Messages
+      operationId: list_interface_messages_api_v1_integrations_messages_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: protocol
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Protocol
+      - name: direction
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/MessageDirection'
+          - type: 'null'
+          title: Direction
+      - name: message_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message Type
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/InterfaceMessageSummary'
+                title: Response List Interface Messages Api V1 Integrations Messages
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/integrations/device-gateway/messages:
+    get:
+      tags:
+      - integrations
+      summary: List Device Messages
+      operationId: list_device_messages_api_v1_integrations_device_gateway_messages_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/RawInstrumentMessageSummary'
+                title: Response List Device Messages Api V1 Integrations Device Gateway
+                  Messages Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/integrations/hl7v2/import/oml-o33:
+    post:
+      tags:
+      - integrations
+      summary: Import Oml O33
+      operationId: import_oml_o33_api_v1_integrations_hl7v2_import_oml_o33_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HL7MessageImportRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HL7OrderImportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/integrations/hl7v2/import/oru-r01:
+    post:
+      tags:
+      - integrations
+      summary: Import Oru R01
+      operationId: import_oru_r01_api_v1_integrations_hl7v2_import_oru_r01_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HL7MessageImportRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HL7ResultImportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/integrations/hl7v2/export/oml-o33/{order_id}:
+    get:
+      tags:
+      - integrations
+      summary: Export Oml O33
+      operationId: export_oml_o33_api_v1_integrations_hl7v2_export_oml_o33__order_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Order Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/integrations/hl7v2/export/oru-r01/{report_id}:
+    get:
+      tags:
+      - integrations
+      summary: Export Oru R01
+      operationId: export_oru_r01_api_v1_integrations_hl7v2_export_oru_r01__report_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: report_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Report Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/integrations/astm/export/worklist/{device_id}:
+    get:
+      tags:
+      - integrations
+      summary: Export Astm Worklist
+      operationId: export_astm_worklist_api_v1_integrations_astm_export_worklist__device_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/integrations/astm/import/results:
+    post:
+      tags:
+      - integrations
+      summary: Import Astm Results
+      operationId: import_astm_results_api_v1_integrations_astm_import_results_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ASTMMessageImportRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ASTMImportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/integrations/device-gateway/worklists/{device_id}:
+    get:
+      tags:
+      - integrations
+      summary: Get Device Worklist
+      operationId: get_device_worklist_api_v1_integrations_device_gateway_worklists__device_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceWorklistResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/integrations/device-gateway/ingest:
+    post:
+      tags:
+      - integrations
+      summary: Ingest Device Results
+      operationId: ingest_device_results_api_v1_integrations_device_gateway_ingest_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceGatewayIngestRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceGatewayIngestResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/orders:
     post:
-      tags: [orders]
-      summary: Create an order with one or more requested tests
-      operationId: createOrder
+      tags:
+      - orders
+      summary: Create Order
+      operationId: create_order_api_v1_orders_post
+      security:
+      - HTTPBearer: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateOrderRequest"
+              $ref: '#/components/schemas/CreateOrderRequest'
       responses:
-        "201":
-          description: Order accepted
+        '201':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OrderSummary"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+                $ref: '#/components/schemas/OrderSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     get:
-      tags: [orders]
-      summary: Search orders
-      operationId: listOrders
+      tags:
+      - orders
+      summary: List Orders
+      operationId: list_orders_api_v1_orders_get
+      security:
+      - HTTPBearer: []
       parameters:
-        - name: requisition_no
-          in: query
-          schema:
-            type: string
-        - name: patient_id
-          in: query
-          schema:
-            type: string
+      - name: requisition_no
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requisition No
+      - name: patient_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
             format: uuid
-        - name: status
-          in: query
-          schema:
-            type: string
+          - type: 'null'
+          title: Patient Id
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
       responses:
-        "200":
-          description: Matching orders
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
                 type: object
-                required: [items]
-                properties:
+                additionalProperties:
+                  type: array
                   items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/OrderSummary"
+                    $ref: '#/components/schemas/OrderSummary'
+                title: Response List Orders Api V1 Orders Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/orders/{order_id}:
     get:
-      tags: [orders]
-      summary: Read one order
-      operationId: getOrder
+      tags:
+      - orders
+      summary: Get Order
+      operationId: get_order_api_v1_orders__order_id__get
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/OrderId"
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Order Id
       responses:
-        "200":
-          description: Order detail
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OrderDetail"
-        "404":
-          $ref: "#/components/responses/NotFound"
+                $ref: '#/components/schemas/OrderDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/orders/{order_id}/items:
     post:
-      tags: [orders]
-      summary: Add an item to an existing order
-      operationId: createOrderItem
+      tags:
+      - orders
+      summary: Create Order Item
+      operationId: create_order_item_api_v1_orders__order_id__items_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/OrderId"
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Order Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateOrderItemRequest"
+              $ref: '#/components/schemas/OrderItemCreateRequest'
       responses:
-        "201":
-          description: Order item accepted
+        '201':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OrderItemSummary"
-        "404":
-          $ref: "#/components/responses/NotFound"
+                $ref: '#/components/schemas/OrderItemSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/order-items/{order_item_id}/cancel:
     post:
-      tags: [orders]
-      summary: Cancel one order item
-      operationId: cancelOrderItem
+      tags:
+      - orders
+      summary: Cancel Order Item
+      operationId: cancel_order_item_api_v1_order_items__order_item_id__cancel_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/OrderItemId"
+      - name: order_item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Order Item Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/OrderItemActionRequest"
+              $ref: '#/components/schemas/OrderItemActionRequest'
       responses:
-        "200":
-          description: Order item status changed
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OrderItemSummary"
+                $ref: '#/components/schemas/OrderItemSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/order-items/{order_item_id}/hold:
     post:
-      tags: [orders]
-      summary: Put one order item on hold
-      operationId: holdOrderItem
+      tags:
+      - orders
+      summary: Hold Order Item
+      operationId: hold_order_item_api_v1_order_items__order_item_id__hold_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/OrderItemId"
+      - name: order_item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Order Item Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/OrderItemActionRequest"
+              $ref: '#/components/schemas/OrderItemActionRequest'
       responses:
-        "200":
-          description: Order item status changed
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OrderItemSummary"
+                $ref: '#/components/schemas/OrderItemSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/specimens/accession:
     post:
-      tags: [specimens]
-      summary: Create and accession a new specimen
-      operationId: accessionSpecimen
+      tags:
+      - specimens
+      summary: Accession Specimen
+      operationId: accession_specimen_api_v1_specimens_accession_post
       requestBody:
-        required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AccessionSpecimenRequest"
+              $ref: '#/components/schemas/AccessionSpecimenRequest'
+        required: true
       responses:
-        "201":
-          description: Specimen accessioned
+        '201':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SpecimenSummary"
+                $ref: '#/components/schemas/SpecimenSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/specimens/{specimen_id}/collect:
     post:
-      tags: [specimens]
-      summary: Mark a specimen as collected
-      operationId: collectSpecimen
+      tags:
+      - specimens
+      summary: Collect Specimen
+      operationId: collect_specimen_api_v1_specimens__specimen_id__collect_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/SpecimenId"
+      - name: specimen_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Specimen Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CollectSpecimenRequest"
+              $ref: '#/components/schemas/CollectSpecimenRequest'
       responses:
-        "200":
-          description: Specimen state updated
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SpecimenSummary"
+                $ref: '#/components/schemas/SpecimenSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/specimens/{specimen_id}/receive:
     post:
-      tags: [specimens]
-      summary: Mark a specimen as received
-      operationId: receiveSpecimen
+      tags:
+      - specimens
+      summary: Receive Specimen
+      operationId: receive_specimen_api_v1_specimens__specimen_id__receive_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/SpecimenId"
+      - name: specimen_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Specimen Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ReceiveSpecimenRequest"
+              $ref: '#/components/schemas/ReceiveSpecimenRequest'
       responses:
-        "200":
-          description: Specimen state updated
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SpecimenSummary"
+                $ref: '#/components/schemas/SpecimenSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/specimens/{specimen_id}/accept:
     post:
-      tags: [specimens]
-      summary: Accept a received specimen
-      operationId: acceptSpecimen
+      tags:
+      - specimens
+      summary: Accept Specimen
+      operationId: accept_specimen_api_v1_specimens__specimen_id__accept_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/SpecimenId"
+      - name: specimen_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Specimen Id
       responses:
-        "200":
-          description: Specimen state updated
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SpecimenSummary"
+                $ref: '#/components/schemas/SpecimenSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/specimens/{specimen_id}/reject:
     post:
-      tags: [specimens]
-      summary: Reject a specimen
-      operationId: rejectSpecimen
+      tags:
+      - specimens
+      summary: Reject Specimen
+      operationId: reject_specimen_api_v1_specimens__specimen_id__reject_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/SpecimenId"
+      - name: specimen_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Specimen Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RejectSpecimenRequest"
+              $ref: '#/components/schemas/RejectSpecimenRequest'
       responses:
-        "200":
-          description: Specimen state updated
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SpecimenSummary"
+                $ref: '#/components/schemas/SpecimenSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/specimens/{specimen_id}/aliquot:
     post:
-      tags: [specimens]
-      summary: Create a child aliquot from a specimen
-      operationId: aliquotSpecimen
+      tags:
+      - specimens
+      summary: Aliquot Specimen
+      operationId: aliquot_specimen_api_v1_specimens__specimen_id__aliquot_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/SpecimenId"
+      - name: specimen_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Specimen Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AliquotSpecimenRequest"
+              $ref: '#/components/schemas/AliquotSpecimenRequest'
       responses:
-        "201":
-          description: Child specimen created
+        '201':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SpecimenSummary"
+                $ref: '#/components/schemas/SpecimenSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/specimens/{specimen_id}/move:
     post:
-      tags: [specimens]
-      summary: Move a specimen container to another storage location
-      operationId: moveSpecimen
+      tags:
+      - specimens
+      summary: Move Specimen
+      operationId: move_specimen_api_v1_specimens__specimen_id__move_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/SpecimenId"
+      - name: specimen_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Specimen Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/MoveSpecimenRequest"
+              $ref: '#/components/schemas/MoveSpecimenRequest'
       responses:
-        "200":
-          description: Specimen state updated
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SpecimenSummary"
+                $ref: '#/components/schemas/SpecimenSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/specimens/{specimen_id}/trace:
     get:
-      tags: [specimens]
-      summary: Read the specimen event trail
-      operationId: getSpecimenTrace
+      tags:
+      - specimens
+      summary: Get Specimen Trace
+      operationId: get_specimen_trace_api_v1_specimens__specimen_id__trace_get
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/SpecimenId"
+      - name: specimen_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Specimen Id
       responses:
-        "200":
-          description: Traceability view
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SpecimenTraceResponse"
+                $ref: '#/components/schemas/SpecimenTraceResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/tasks:
     post:
-      tags: [tasks]
-      summary: Create a work task
-      operationId: createTask
+      tags:
+      - tasks
+      summary: Create Task
+      operationId: create_task_api_v1_tasks_post
+      security:
+      - HTTPBearer: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateTaskRequest"
+              $ref: '#/components/schemas/CreateTaskRequest'
       responses:
-        "201":
-          description: Task accepted
+        '201':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskSummary"
+                $ref: '#/components/schemas/TaskSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     get:
-      tags: [tasks]
-      summary: Search tasks by queue or status
-      operationId: listTasks
+      tags:
+      - tasks
+      summary: List Tasks
+      operationId: list_tasks_api_v1_tasks_get
+      security:
+      - HTTPBearer: []
       parameters:
-        - name: queue
-          in: query
-          schema:
-            type: string
-        - name: status
-          in: query
-          schema:
-            type: string
-        - name: owner_user_id
-          in: query
-          schema:
-            type: string
+      - name: queue
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Queue
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: owner_user_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
             format: uuid
+          - type: 'null'
+          title: Owner User Id
       responses:
-        "200":
-          description: Matching tasks
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
                 type: object
-                required: [items]
-                properties:
+                additionalProperties:
+                  type: array
                   items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/TaskSummary"
+                    $ref: '#/components/schemas/TaskSummary'
+                title: Response List Tasks Api V1 Tasks Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/tasks/{task_id}/claim:
     post:
-      tags: [tasks]
-      summary: Claim a task for a user
-      operationId: claimTask
+      tags:
+      - tasks
+      summary: Claim Task
+      operationId: claim_task_api_v1_tasks__task_id__claim_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/TaskId"
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Task Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TaskActionRequest"
+              $ref: '#/components/schemas/TaskActionRequest'
       responses:
-        "200":
-          description: Task updated
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskSummary"
+                $ref: '#/components/schemas/TaskSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/tasks/{task_id}/start:
     post:
-      tags: [tasks]
-      summary: Start work on a claimed task
-      operationId: startTask
+      tags:
+      - tasks
+      summary: Start Task
+      operationId: start_task_api_v1_tasks__task_id__start_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/TaskId"
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Task Id
       requestBody:
-        required: false
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TaskActionRequest"
+              anyOf:
+              - $ref: '#/components/schemas/TaskActionRequest'
+              - type: 'null'
+              title: Payload
       responses:
-        "200":
-          description: Task updated
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskSummary"
+                $ref: '#/components/schemas/TaskSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/tasks/{task_id}/pause:
     post:
-      tags: [tasks]
-      summary: Pause work on a task
-      operationId: pauseTask
+      tags:
+      - tasks
+      summary: Pause Task
+      operationId: pause_task_api_v1_tasks__task_id__pause_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/TaskId"
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Task Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TaskActionRequest"
+              $ref: '#/components/schemas/TaskActionRequest'
       responses:
-        "200":
-          description: Task updated
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskSummary"
+                $ref: '#/components/schemas/TaskSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/tasks/{task_id}/complete:
     post:
-      tags: [tasks]
-      summary: Complete a task
-      operationId: completeTask
+      tags:
+      - tasks
+      summary: Complete Task
+      operationId: complete_task_api_v1_tasks__task_id__complete_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/TaskId"
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Task Id
       requestBody:
-        required: false
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TaskActionRequest"
+              anyOf:
+              - $ref: '#/components/schemas/TaskActionRequest'
+              - type: 'null'
+              title: Payload
       responses:
-        "200":
-          description: Task updated
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskSummary"
+                $ref: '#/components/schemas/TaskSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/tasks/{task_id}/fail:
     post:
-      tags: [tasks]
-      summary: Fail a task with a reason
-      operationId: failTask
+      tags:
+      - tasks
+      summary: Fail Task
+      operationId: fail_task_api_v1_tasks__task_id__fail_post
+      security:
+      - HTTPBearer: []
       parameters:
-        - $ref: "#/components/parameters/TaskId"
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Task Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TaskActionRequest"
+              $ref: '#/components/schemas/TaskActionRequest'
       responses:
-        "200":
-          description: Task updated
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskSummary"
+                $ref: '#/components/schemas/TaskSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/observations/manual:
+    post:
+      tags:
+      - observations
+      summary: Create Manual Observation
+      operationId: create_manual_observation_api_v1_observations_manual_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateManualObservationRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/observations:
+    get:
+      tags:
+      - observations
+      summary: List Observations
+      operationId: list_observations_api_v1_observations_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: specimen_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Specimen Id
+      - name: order_item_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Order Item Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ObservationSummary'
+                title: Response List Observations Api V1 Observations Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/observations/{observation_id}:
+    get:
+      tags:
+      - observations
+      summary: Get Observation
+      operationId: get_observation_api_v1_observations__observation_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: observation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Observation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/observations/{observation_id}/technical-verify:
+    post:
+      tags:
+      - observations
+      summary: Technical Verify Observation
+      operationId: technical_verify_observation_api_v1_observations__observation_id__technical_verify_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: observation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Observation Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TechnicalVerifyObservationRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/observations/{observation_id}/correct:
+    post:
+      tags:
+      - observations
+      summary: Correct Observation
+      operationId: correct_observation_api_v1_observations__observation_id__correct_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: observation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Observation Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorrectObservationRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/generate:
+    post:
+      tags:
+      - reports
+      summary: Generate Report
+      operationId: generate_report_api_v1_reports_generate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticReportSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/reports/{report_id}:
+    get:
+      tags:
+      - reports
+      summary: Get Report
+      operationId: get_report_api_v1_reports__report_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: report_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Report Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticReportSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/{report_id}/authorize:
+    post:
+      tags:
+      - reports
+      summary: Authorize Report
+      operationId: authorize_report_api_v1_reports__report_id__authorize_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: report_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Report Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizeReportRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticReportSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/{report_id}/amend:
+    post:
+      tags:
+      - reports
+      summary: Amend Report
+      operationId: amend_report_api_v1_reports__report_id__amend_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: report_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Report Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmendReportRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticReportSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/{report_id}/pdf:
+    get:
+      tags:
+      - reports
+      summary: Get Report Pdf
+      operationId: get_report_pdf_api_v1_reports__report_id__pdf_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: report_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Report Id
+      - name: version
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Version
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+            application/pdf: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/audit:
+    get:
+      tags:
+      - audit
+      summary: Search Audit
+      operationId: search_audit_api_v1_audit_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: entity_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity Type
+      - name: entity_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Entity Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AuditEventSummary'
+                title: Response Search Audit Api V1 Audit Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/provenance:
+    get:
+      tags:
+      - audit
+      summary: Search Provenance
+      operationId: search_provenance_api_v1_provenance_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: target_resource_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Resource Type
+      - name: target_resource_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Target Resource Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ProvenanceRecordSummary'
+                title: Response Search Provenance Api V1 Provenance Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /:
+    get:
+      tags:
+      - system
+      summary: Read Root
+      operationId: read_root__get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Read Root  Get
 components:
-  parameters:
-    OrderId:
-      name: order_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    OrderItemId:
-      name: order_item_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    SpecimenId:
-      name: specimen_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    TaskId:
-      name: task_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-  responses:
-    BadRequest:
-      description: Invalid request payload
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ApiError"
-    NotFound:
-      description: Resource not found
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ApiError"
   schemas:
-    HealthResponse:
-      type: object
-      required: [service, status, version, contract_path]
+    ASTMImportResponse:
       properties:
-        service:
-          type: string
-        status:
-          type: string
-        version:
-          type: string
-        contract_path:
-          type: string
-    ApiError:
-      type: object
-      required: [detail]
-      properties:
-        detail:
-          type: string
-    CreateOrderRequest:
-      type: object
-      required:
-        - patient_id
-        - source_system
-        - priority
-        - ordered_at
-        - items
-      properties:
-        patient_id:
+        raw_message_id:
           type: string
           format: uuid
-        encounter_case_id:
+          title: Raw Message Id
+        device_id:
           type: string
           format: uuid
-        source_system:
-          type: string
-        placer_order_no:
-          type: string
-        priority:
-          type: string
-          enum: [routine, urgent, asap, stat]
-        clinical_info:
-          type: string
-        requested_by_practitioner_role_id:
-          type: string
-          format: uuid
-        ordered_at:
-          type: string
-          format: date-time
-        metadata:
-          type: object
-          additionalProperties: true
-        items:
-          type: array
-          minItems: 1
+          title: Device Id
+        created_observations:
           items:
-            $ref: "#/components/schemas/CreateOrderItemRequest"
-    CreateOrderItemRequest:
+            $ref: '#/components/schemas/IntegratedObservationSummary'
+          type: array
+          title: Created Observations
+        errors:
+          items:
+            type: string
+          type: array
+          title: Errors
+      additionalProperties: false
       type: object
       required:
-        - test_catalog_id
+      - raw_message_id
+      - device_id
+      title: ASTMImportResponse
+    ASTMMessageImportRequest:
       properties:
-        test_catalog_id:
+        device_id:
           type: string
           format: uuid
-        requested_specimen_type_code:
+          title: Device Id
+        message:
           type: string
-        priority:
-          type: string
-          enum: [routine, urgent, asap, stat]
-        reflex_policy_code:
-          type: string
-        aoe_payload:
-          type: object
-          additionalProperties: true
-    OrderSummary:
+          title: Message
+        auto_verify:
+          type: boolean
+          title: Auto Verify
+          default: false
+      additionalProperties: false
       type: object
       required:
-        - id
-        - requisition_no
-        - patient_id
-        - source_system
-        - priority
-        - status
-        - ordered_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        requisition_no:
-          type: string
-        patient_id:
-          type: string
-          format: uuid
-        source_system:
-          type: string
-        priority:
-          type: string
-        status:
-          type: string
-        ordered_at:
-          type: string
-          format: date-time
-    OrderDetail:
-      allOf:
-        - $ref: "#/components/schemas/OrderSummary"
-        - type: object
-          properties:
-            encounter_case_id:
-              type: string
-              format: uuid
-            clinical_info:
-              type: string
-            items:
-              type: array
-              items:
-                $ref: "#/components/schemas/OrderItemSummary"
-    OrderItemSummary:
-      type: object
-      required:
-        - id
-        - order_id
-        - line_no
-        - test_catalog_id
-        - status
-      properties:
-        id:
-          type: string
-          format: uuid
-        order_id:
-          type: string
-          format: uuid
-        line_no:
-          type: integer
-        test_catalog_id:
-          type: string
-          format: uuid
-        requested_specimen_type_code:
-          type: string
-        status:
-          type: string
-        priority:
-          type: string
-    OrderItemActionRequest:
-      type: object
-      required: [reason]
-      properties:
-        reason:
-          type: string
-        comment:
-          type: string
+      - device_id
+      - message
+      title: ASTMMessageImportRequest
     AccessionSpecimenRequest:
-      type: object
-      required:
-        - order_id
-        - patient_id
-        - specimen_type_code
       properties:
         order_id:
           type: string
           format: uuid
+          title: Order Id
         patient_id:
           type: string
           format: uuid
+          title: Patient Id
         parent_specimen_id:
-          type: string
-          format: uuid
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Parent Specimen Id
         specimen_type_code:
           type: string
+          title: Specimen Type Code
         source_location_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Source Location Id
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        metadata:
+          additionalProperties: true
+          type: object
+          title: Metadata
+      additionalProperties: false
+      type: object
+      required:
+      - order_id
+      - patient_id
+      - specimen_type_code
+      title: AccessionSpecimenRequest
+    AliquotSpecimenRequest:
+      properties:
+        container_type_code:
+          type: string
+          title: Container Type Code
+        barcode:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Barcode
+        volume_value:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Volume Value
+        volume_ucum:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Volume Ucum
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+      additionalProperties: false
+      type: object
+      required:
+      - container_type_code
+      title: AliquotSpecimenRequest
+    AmendReportRequest:
+      properties:
+        signed_by_user_id:
           type: string
           format: uuid
-        notes:
+          title: Signed By User Id
+        reason:
           type: string
-        metadata:
-          type: object
-          additionalProperties: true
-    CollectSpecimenRequest:
+          title: Reason
+        conclusion_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Conclusion Text
+      additionalProperties: false
       type: object
-      required: [collected_at]
+      required:
+      - signed_by_user_id
+      - reason
+      title: AmendReportRequest
+    AuditEventSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        entity_type:
+          type: string
+          title: Entity Type
+        entity_id:
+          type: string
+          format: uuid
+          title: Entity Id
+        action:
+          type: string
+          title: Action
+        status:
+          type: string
+          title: Status
+        source_system:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source System
+        event_at:
+          type: string
+          format: date-time
+          title: Event At
+        context:
+          additionalProperties: true
+          type: object
+          title: Context
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - entity_type
+      - entity_id
+      - action
+      - status
+      - event_at
+      title: AuditEventSummary
+    AuthorizeReportRequest:
+      properties:
+        signed_by_user_id:
+          type: string
+          format: uuid
+          title: Signed By User Id
+      additionalProperties: false
+      type: object
+      required:
+      - signed_by_user_id
+      title: AuthorizeReportRequest
+    AutoverificationApplyDecision:
+      type: string
+      enum:
+      - auto_finalized
+      - held
+      title: AutoverificationApplyDecision
+    AutoverificationApplyResponse:
+      properties:
+        observation_id:
+          type: string
+          format: uuid
+          title: Observation Id
+        decision:
+          $ref: '#/components/schemas/AutoverificationApplyDecision'
+        matched_rule_count:
+          type: integer
+          title: Matched Rule Count
+        reasons:
+          items:
+            type: string
+          type: array
+          title: Reasons
+        created_task_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Created Task Id
+        rules:
+          items:
+            $ref: '#/components/schemas/AutoverificationRuleEvaluation'
+          type: array
+          title: Rules
+      additionalProperties: false
+      type: object
+      required:
+      - observation_id
+      - decision
+      - matched_rule_count
+      title: AutoverificationApplyResponse
+    AutoverificationCheckDecision:
+      type: string
+      enum:
+      - pass
+      - fail
+      title: AutoverificationCheckDecision
+    AutoverificationEvaluateResponse:
+      properties:
+        observation_id:
+          type: string
+          format: uuid
+          title: Observation Id
+        previous_final_observation_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Previous Final Observation Id
+        overall_decision:
+          $ref: '#/components/schemas/AutoverificationCheckDecision'
+        matched_rule_count:
+          type: integer
+          title: Matched Rule Count
+        implicit_reasons:
+          items:
+            type: string
+          type: array
+          title: Implicit Reasons
+        rules:
+          items:
+            $ref: '#/components/schemas/AutoverificationRuleEvaluation'
+          type: array
+          title: Rules
+      additionalProperties: false
+      type: object
+      required:
+      - observation_id
+      - overall_decision
+      - matched_rule_count
+      title: AutoverificationEvaluateResponse
+    AutoverificationRuleCreateRequest:
+      properties:
+        name:
+          type: string
+          title: Name
+        active:
+          type: boolean
+          title: Active
+          default: true
+        priority:
+          type: integer
+          title: Priority
+          default: 100
+        test_catalog_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Test Catalog Id
+        device_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+        specimen_type_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Specimen Type Code
+        rule_type:
+          $ref: '#/components/schemas/AutoverificationRuleType'
+          default: basic
+        condition:
+          additionalProperties: true
+          type: object
+          title: Condition
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      title: AutoverificationRuleCreateRequest
+    AutoverificationRuleEvaluation:
+      properties:
+        rule_id:
+          type: string
+          format: uuid
+          title: Rule Id
+        rule_name:
+          type: string
+          title: Rule Name
+        priority:
+          type: integer
+          title: Priority
+        decision:
+          $ref: '#/components/schemas/AutoverificationCheckDecision'
+        reasons:
+          items:
+            type: string
+          type: array
+          title: Reasons
+        condition:
+          additionalProperties: true
+          type: object
+          title: Condition
+      additionalProperties: false
+      type: object
+      required:
+      - rule_id
+      - rule_name
+      - priority
+      - decision
+      title: AutoverificationRuleEvaluation
+    AutoverificationRuleSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        active:
+          type: boolean
+          title: Active
+        priority:
+          type: integer
+          title: Priority
+        test_catalog_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Test Catalog Id
+        device_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+        specimen_type_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Specimen Type Code
+        rule_type:
+          $ref: '#/components/schemas/AutoverificationRuleType'
+        condition:
+          additionalProperties: true
+          type: object
+          title: Condition
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - name
+      - active
+      - priority
+      - rule_type
+      - created_at
+      - updated_at
+      title: AutoverificationRuleSummary
+    AutoverificationRuleType:
+      type: string
+      enum:
+      - basic
+      - delta
+      title: AutoverificationRuleType
+    AutoverificationRunSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        observation_id:
+          type: string
+          format: uuid
+          title: Observation Id
+        rule_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Rule Id
+        decision:
+          type: string
+          title: Decision
+        reasons:
+          items:
+            type: string
+          type: array
+          title: Reasons
+        evaluated_at:
+          type: string
+          format: date-time
+          title: Evaluated At
+        created_task_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Created Task Id
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - observation_id
+      - decision
+      - evaluated_at
+      title: AutoverificationRunSummary
+    BootstrapAdminRequest:
+      properties:
+        username:
+          type: string
+          title: Username
+        password:
+          type: string
+          minLength: 8
+          title: Password
+        display_name:
+          type: string
+          title: Display Name
+      additionalProperties: false
+      type: object
+      required:
+      - username
+      - password
+      - display_name
+      title: BootstrapAdminRequest
+    CollectSpecimenRequest:
       properties:
         collected_at:
           type: string
           format: date-time
+          title: Collected At
         collected_by_practitioner_role_id:
-          type: string
-          format: uuid
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Collected By Practitioner Role Id
         container_barcodes:
-          type: array
           items:
             type: string
-    ReceiveSpecimenRequest:
+          type: array
+          title: Container Barcodes
+      additionalProperties: false
       type: object
-      required: [received_at]
+      required:
+      - collected_at
+      title: CollectSpecimenRequest
+    CorrectObservationRequest:
       properties:
-        received_at:
+        reason:
           type: string
-          format: date-time
-        location_id:
+          title: Reason
+        replacement:
+          anyOf:
+          - $ref: '#/components/schemas/CreateManualObservationRequest'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - reason
+      title: CorrectObservationRequest
+    CreateManualObservationRequest:
+      properties:
+        order_item_id:
           type: string
           format: uuid
-    RejectSpecimenRequest:
+          title: Order Item Id
+        specimen_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Specimen Id
+        code_local:
+          type: string
+          title: Code Local
+        code_loinc:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code Loinc
+        status:
+          $ref: '#/components/schemas/ObservationStatus'
+          default: preliminary
+        value_type:
+          $ref: '#/components/schemas/ObservationValueType'
+        value_num:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Value Num
+        value_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Text
+        value_boolean:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Value Boolean
+        value_code_system:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Code System
+        value_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Code
+        unit_ucum:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit Ucum
+        interpretation_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Interpretation Code
+        abnormal_flag:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Abnormal Flag
+        method_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Method Code
+        device_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+        effective_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Effective At
+        reference_interval_snapshot:
+          additionalProperties: true
+          type: object
+          title: Reference Interval Snapshot
+      additionalProperties: false
       type: object
-      required: [rejection_reason_code]
+      required:
+      - order_item_id
+      - code_local
+      - value_type
+      title: CreateManualObservationRequest
+    CreateOrderRequest:
       properties:
-        rejection_reason_code:
+        patient_id:
           type: string
-        notes:
+          format: uuid
+          title: Patient Id
+        encounter_case_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Encounter Case Id
+        source_system:
           type: string
-    AliquotSpecimenRequest:
+          title: Source System
+        placer_order_no:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Placer Order No
+        priority:
+          $ref: '#/components/schemas/OrderPriority'
+        clinical_info:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Clinical Info
+        requested_by_practitioner_role_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Requested By Practitioner Role Id
+        ordered_at:
+          type: string
+          format: date-time
+          title: Ordered At
+        metadata:
+          additionalProperties: true
+          type: object
+          title: Metadata
+        items:
+          items:
+            $ref: '#/components/schemas/OrderItemCreateRequest'
+          type: array
+          title: Items
+      additionalProperties: false
       type: object
-      required: [container_type_code]
+      required:
+      - patient_id
+      - source_system
+      - priority
+      - ordered_at
+      - items
+      title: CreateOrderRequest
+    CreateReportRequest:
       properties:
-        container_type_code:
+        order_id:
           type: string
-        barcode:
+          format: uuid
+          title: Order Id
+        code_local:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code Local
+        code_loinc:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code Loinc
+        conclusion_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Conclusion Text
+      additionalProperties: false
+      type: object
+      required:
+      - order_id
+      title: CreateReportRequest
+    CreateTaskRequest:
+      properties:
+        group_identifier:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Group Identifier
+        based_on_order_item_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Based On Order Item Id
+        focus_type:
+          $ref: '#/components/schemas/TaskFocusType'
+        focus_id:
           type: string
-        volume_value:
-          type: number
-        volume_ucum:
+          format: uuid
+          title: Focus Id
+        queue_code:
           type: string
-        notes:
+          title: Queue Code
+        status:
           type: string
+          title: Status
+        business_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Business Status
+        priority:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Priority
+        owner_user_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Owner User Id
+        owner_practitioner_role_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Owner Practitioner Role Id
+        device_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+        due_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Due At
+        inputs:
+          additionalProperties: true
+          type: object
+          title: Inputs
+      additionalProperties: false
+      type: object
+      required:
+      - focus_type
+      - focus_id
+      - queue_code
+      - status
+      title: CreateTaskRequest
+    DeviceCreateRequest:
+      properties:
+        code:
+          type: string
+          title: Code
+        name:
+          type: string
+          title: Name
+        manufacturer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Manufacturer
+        model:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model
+        serial_no:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Serial No
+        protocol_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Protocol Code
+      additionalProperties: false
+      type: object
+      required:
+      - code
+      - name
+      title: DeviceCreateRequest
+    DeviceGatewayIngestRequest:
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        protocol:
+          type: string
+          title: Protocol
+          default: device-gateway
+        accession_no:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Accession No
+        specimen_barcode:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Specimen Barcode
+        auto_verify:
+          type: boolean
+          title: Auto Verify
+          default: false
+        results:
+          items:
+            $ref: '#/components/schemas/DeviceResultEntryRequest'
+          type: array
+          title: Results
+      additionalProperties: false
+      type: object
+      required:
+      - device_id
+      - results
+      title: DeviceGatewayIngestRequest
+    DeviceGatewayIngestResponse:
+      properties:
+        raw_message_id:
+          type: string
+          format: uuid
+          title: Raw Message Id
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        order_id:
+          type: string
+          format: uuid
+          title: Order Id
+        specimen_id:
+          type: string
+          format: uuid
+          title: Specimen Id
+        created_observations:
+          items:
+            $ref: '#/components/schemas/IntegratedObservationSummary'
+          type: array
+          title: Created Observations
+        errors:
+          items:
+            type: string
+          type: array
+          title: Errors
+      additionalProperties: false
+      type: object
+      required:
+      - raw_message_id
+      - device_id
+      - order_id
+      - specimen_id
+      title: DeviceGatewayIngestResponse
+    DeviceResultEntryRequest:
+      properties:
+        incoming_test_code:
+          type: string
+          title: Incoming Test Code
+        value_type:
+          $ref: '#/components/schemas/ObservationValueType'
+        value_num:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Value Num
+        value_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Text
+        value_boolean:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Value Boolean
+        value_code_system:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Code System
+        value_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Code
+        unit_ucum:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit Ucum
+        abnormal_flag:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Abnormal Flag
+        effective_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Effective At
+      additionalProperties: false
+      type: object
+      required:
+      - incoming_test_code
+      - value_type
+      title: DeviceResultEntryRequest
+    DeviceSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        code:
+          type: string
+          title: Code
+        name:
+          type: string
+          title: Name
+        manufacturer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Manufacturer
+        model:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model
+        serial_no:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Serial No
+        protocol_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Protocol Code
+        active:
+          type: boolean
+          title: Active
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - code
+      - name
+      - active
+      - created_at
+      title: DeviceSummary
+    DeviceTestMapCreateRequest:
+      properties:
+        incoming_test_code:
+          type: string
+          title: Incoming Test Code
+        test_catalog_id:
+          type: string
+          format: uuid
+          title: Test Catalog Id
+        default_unit_ucum:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Default Unit Ucum
+      additionalProperties: false
+      type: object
+      required:
+      - incoming_test_code
+      - test_catalog_id
+      title: DeviceTestMapCreateRequest
+    DeviceTestMapSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        incoming_test_code:
+          type: string
+          title: Incoming Test Code
+        test_catalog_id:
+          type: string
+          format: uuid
+          title: Test Catalog Id
+        default_unit_ucum:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Default Unit Ucum
+        active:
+          type: boolean
+          title: Active
+        local_code:
+          type: string
+          title: Local Code
+        display_name:
+          type: string
+          title: Display Name
+        loinc_num:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Loinc Num
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - device_id
+      - incoming_test_code
+      - test_catalog_id
+      - active
+      - local_code
+      - display_name
+      - created_at
+      title: DeviceTestMapSummary
+    DeviceWorklistItem:
+      properties:
+        order_item_id:
+          type: string
+          format: uuid
+          title: Order Item Id
+        order_id:
+          type: string
+          format: uuid
+          title: Order Id
+        requisition_no:
+          type: string
+          title: Requisition No
+        specimen_id:
+          type: string
+          format: uuid
+          title: Specimen Id
+        accession_no:
+          type: string
+          title: Accession No
+        specimen_barcode:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Specimen Barcode
+        incoming_test_code:
+          type: string
+          title: Incoming Test Code
+        test_catalog_id:
+          type: string
+          format: uuid
+          title: Test Catalog Id
+        local_code:
+          type: string
+          title: Local Code
+        display_name:
+          type: string
+          title: Display Name
+        loinc_num:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Loinc Num
+        order_item_status:
+          type: string
+          title: Order Item Status
+        specimen_status:
+          type: string
+          title: Specimen Status
+      additionalProperties: false
+      type: object
+      required:
+      - order_item_id
+      - order_id
+      - requisition_no
+      - specimen_id
+      - accession_no
+      - incoming_test_code
+      - test_catalog_id
+      - local_code
+      - display_name
+      - order_item_status
+      - specimen_status
+      title: DeviceWorklistItem
+    DeviceWorklistResponse:
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        items:
+          items:
+            $ref: '#/components/schemas/DeviceWorklistItem'
+          type: array
+          title: Items
+      additionalProperties: false
+      type: object
+      required:
+      - device_id
+      title: DeviceWorklistResponse
+    DiagnosticReportSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        report_no:
+          type: string
+          title: Report No
+        order_id:
+          type: string
+          format: uuid
+          title: Order Id
+        patient_id:
+          type: string
+          format: uuid
+          title: Patient Id
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        category_code:
+          type: string
+          title: Category Code
+        code_local:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code Local
+        code_loinc:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code Loinc
+        effective_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Effective At
+        issued_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Issued At
+        conclusion_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Conclusion Text
+        current_version_no:
+          type: integer
+          title: Current Version No
+        versions:
+          items:
+            $ref: '#/components/schemas/DiagnosticReportVersionSummary'
+          type: array
+          title: Versions
+        observation_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Observation Ids
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - report_no
+      - order_id
+      - patient_id
+      - status
+      - category_code
+      - current_version_no
+      title: DiagnosticReportSummary
+    DiagnosticReportVersionSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        report_id:
+          type: string
+          format: uuid
+          title: Report Id
+        version_no:
+          type: integer
+          title: Version No
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        amendment_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Amendment Reason
+        rendered_pdf_uri:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Rendered Pdf Uri
+        signed_by_user_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Signed By User Id
+        signed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Signed At
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - report_id
+      - version_no
+      - status
+      - created_at
+      title: DiagnosticReportVersionSummary
+    HL7MessageImportRequest:
+      properties:
+        message:
+          type: string
+          title: Message
+        create_missing_patient:
+          type: boolean
+          title: Create Missing Patient
+          default: true
+      additionalProperties: false
+      type: object
+      required:
+      - message
+      title: HL7MessageImportRequest
+    HL7OrderImportResponse:
+      properties:
+        message_log_id:
+          type: string
+          format: uuid
+          title: Message Log Id
+        patient:
+          $ref: '#/components/schemas/PatientSummary'
+        order:
+          $ref: '#/components/schemas/OrderSummary'
+        items:
+          items:
+            $ref: '#/components/schemas/OrderItemSummary'
+          type: array
+          title: Items
+        specimens:
+          items:
+            $ref: '#/components/schemas/SpecimenSummary'
+          type: array
+          title: Specimens
+      additionalProperties: false
+      type: object
+      required:
+      - message_log_id
+      - patient
+      - order
+      title: HL7OrderImportResponse
+    HL7ResultImportResponse:
+      properties:
+        message_log_id:
+          type: string
+          format: uuid
+          title: Message Log Id
+        order_id:
+          type: string
+          format: uuid
+          title: Order Id
+        specimen_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Specimen Id
+        created_observation_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Created Observation Ids
+        observations:
+          items:
+            $ref: '#/components/schemas/ObservationSummary'
+          type: array
+          title: Observations
+      additionalProperties: false
+      type: object
+      required:
+      - message_log_id
+      - order_id
+      title: HL7ResultImportResponse
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthResponse:
+      properties:
+        service:
+          type: string
+          title: Service
+        status:
+          type: string
+          title: Status
+        version:
+          type: string
+          title: Version
+        contract_path:
+          type: string
+          title: Contract Path
+      additionalProperties: false
+      type: object
+      required:
+      - service
+      - status
+      - version
+      - contract_path
+      title: HealthResponse
+    IntegratedObservationSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        order_item_id:
+          type: string
+          format: uuid
+          title: Order Item Id
+        specimen_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Specimen Id
+        raw_message_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Raw Message Id
+        code_local:
+          type: string
+          title: Code Local
+        code_loinc:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code Loinc
+        status:
+          $ref: '#/components/schemas/ObservationStatus'
+        category_code:
+          type: string
+          title: Category Code
+        value_type:
+          $ref: '#/components/schemas/ObservationValueType'
+        value_num:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Value Num
+        value_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Text
+        value_boolean:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Value Boolean
+        value_code_system:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Code System
+        value_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Code
+        unit_ucum:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit Ucum
+        interpretation_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Interpretation Code
+        abnormal_flag:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Abnormal Flag
+        method_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Method Code
+        device_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+        effective_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Effective At
+        issued_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Issued At
+        reference_interval_snapshot:
+          additionalProperties: true
+          type: object
+          title: Reference Interval Snapshot
+        autoverification:
+          anyOf:
+          - $ref: '#/components/schemas/AutoverificationApplyResponse'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - order_item_id
+      - code_local
+      - status
+      - category_code
+      - value_type
+      title: IntegratedObservationSummary
+    InterfaceMessageSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        protocol:
+          type: string
+          title: Protocol
+        direction:
+          $ref: '#/components/schemas/MessageDirection'
+        message_type:
+          type: string
+          title: Message Type
+        control_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Control Id
+        related_entity_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Related Entity Type
+        related_entity_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Related Entity Id
+        processed_ok:
+          type: boolean
+          title: Processed Ok
+        error_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error Text
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - protocol
+      - direction
+      - message_type
+      - processed_ok
+      - created_at
+      title: InterfaceMessageSummary
+    LoginRequest:
+      properties:
+        username:
+          type: string
+          title: Username
+        password:
+          type: string
+          title: Password
+      additionalProperties: false
+      type: object
+      required:
+      - username
+      - password
+      title: LoginRequest
+    MessageDirection:
+      type: string
+      enum:
+      - inbound
+      - outbound
+      title: MessageDirection
     MoveSpecimenRequest:
-      type: object
-      required: [storage_location_id]
       properties:
         storage_location_id:
           type: string
           format: uuid
+          title: Storage Location Id
         position_code:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Position Code
         comment:
-          type: string
-    SpecimenSummary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+      additionalProperties: false
       type: object
       required:
-        - id
-        - accession_no
-        - order_id
-        - patient_id
-        - specimen_type_code
-        - status
+      - storage_location_id
+      title: MoveSpecimenRequest
+    ObservationStatus:
+      type: string
+      enum:
+      - registered
+      - preliminary
+      - final
+      - amended
+      - corrected
+      - cancelled
+      - entered_in_error
+      title: ObservationStatus
+    ObservationSummary:
       properties:
         id:
           type: string
           format: uuid
-        accession_no:
-          type: string
-        order_id:
+          title: Id
+        order_item_id:
           type: string
           format: uuid
+          title: Order Item Id
+        specimen_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Specimen Id
+        raw_message_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Raw Message Id
+        code_local:
+          type: string
+          title: Code Local
+        code_loinc:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code Loinc
+        status:
+          $ref: '#/components/schemas/ObservationStatus'
+        category_code:
+          type: string
+          title: Category Code
+        value_type:
+          $ref: '#/components/schemas/ObservationValueType'
+        value_num:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Value Num
+        value_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Text
+        value_boolean:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Value Boolean
+        value_code_system:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Code System
+        value_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value Code
+        unit_ucum:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit Ucum
+        interpretation_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Interpretation Code
+        abnormal_flag:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Abnormal Flag
+        method_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Method Code
+        device_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+        effective_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Effective At
+        issued_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Issued At
+        reference_interval_snapshot:
+          additionalProperties: true
+          type: object
+          title: Reference Interval Snapshot
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - order_item_id
+      - code_local
+      - status
+      - category_code
+      - value_type
+      title: ObservationSummary
+    ObservationValueType:
+      type: string
+      enum:
+      - quantity
+      - text
+      - coded
+      - boolean
+      - range
+      - attachment
+      title: ObservationValueType
+    OrderDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        requisition_no:
+          type: string
+          title: Requisition No
         patient_id:
           type: string
           format: uuid
-        specimen_type_code:
+          title: Patient Id
+        source_system:
           type: string
-        status:
-          type: string
-        collected_at:
-          type: string
-          format: date-time
-        received_at:
-          type: string
-          format: date-time
-    SpecimenTraceEvent:
-      type: object
-      required: [event_type, occurred_at]
-      properties:
-        event_type:
-          type: string
-        occurred_at:
-          type: string
-          format: date-time
-        performed_by_user_id:
-          type: string
-          format: uuid
-        location_id:
-          type: string
-          format: uuid
-        details:
-          type: object
-          additionalProperties: true
-    SpecimenTraceResponse:
-      type: object
-      required: [specimen, events]
-      properties:
-        specimen:
-          $ref: "#/components/schemas/SpecimenSummary"
-        events:
-          type: array
-          items:
-            $ref: "#/components/schemas/SpecimenTraceEvent"
-    CreateTaskRequest:
-      type: object
-      required:
-        - focus_type
-        - focus_id
-        - queue_code
-        - status
-      properties:
-        group_identifier:
-          type: string
-        based_on_order_item_id:
-          type: string
-          format: uuid
-        focus_type:
-          type: string
-          enum: [order-item, specimen, observation, report]
-        focus_id:
-          type: string
-          format: uuid
-        queue_code:
-          type: string
-        status:
-          type: string
-        business_status:
-          type: string
+          title: Source System
         priority:
           type: string
-        owner_user_id:
+          title: Priority
+        status:
           type: string
-          format: uuid
-        owner_practitioner_role_id:
-          type: string
-          format: uuid
-        device_id:
-          type: string
-          format: uuid
-        due_at:
+          title: Status
+        ordered_at:
           type: string
           format: date-time
-        inputs:
-          type: object
-          additionalProperties: true
-    TaskActionRequest:
-      type: object
-      properties:
-        owner_user_id:
-          type: string
-          format: uuid
-        owner_practitioner_role_id:
-          type: string
-          format: uuid
-        business_status:
-          type: string
-        reason:
-          type: string
-        comment:
-          type: string
-        outputs:
-          type: object
-          additionalProperties: true
-    TaskSummary:
+          title: Ordered At
+        encounter_case_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Encounter Case Id
+        clinical_info:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Clinical Info
+        items:
+          items:
+            $ref: '#/components/schemas/OrderItemSummary'
+          type: array
+          title: Items
+      additionalProperties: false
       type: object
       required:
-        - id
-        - focus_type
-        - focus_id
-        - queue_code
-        - status
-        - authored_on
+      - id
+      - requisition_no
+      - patient_id
+      - source_system
+      - priority
+      - status
+      - ordered_at
+      title: OrderDetail
+    OrderItemActionRequest:
+      properties:
+        reason:
+          type: string
+          title: Reason
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+      additionalProperties: false
+      type: object
+      required:
+      - reason
+      title: OrderItemActionRequest
+    OrderItemCreateRequest:
+      properties:
+        test_catalog_id:
+          type: string
+          format: uuid
+          title: Test Catalog Id
+        requested_specimen_type_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requested Specimen Type Code
+        priority:
+          anyOf:
+          - $ref: '#/components/schemas/OrderPriority'
+          - type: 'null'
+        reflex_policy_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reflex Policy Code
+        aoe_payload:
+          additionalProperties: true
+          type: object
+          title: Aoe Payload
+      additionalProperties: false
+      type: object
+      required:
+      - test_catalog_id
+      title: OrderItemCreateRequest
+    OrderItemSummary:
       properties:
         id:
           type: string
           format: uuid
-        group_identifier:
-          type: string
-        based_on_order_item_id:
+          title: Id
+        order_id:
           type: string
           format: uuid
-        focus_type:
+          title: Order Id
+        line_no:
+          type: integer
+          title: Line No
+        test_catalog_id:
           type: string
+          format: uuid
+          title: Test Catalog Id
+        requested_specimen_type_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requested Specimen Type Code
+        status:
+          type: string
+          title: Status
+        priority:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Priority
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - order_id
+      - line_no
+      - test_catalog_id
+      - status
+      title: OrderItemSummary
+    OrderPriority:
+      type: string
+      enum:
+      - routine
+      - urgent
+      - asap
+      - stat
+      title: OrderPriority
+    OrderSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        requisition_no:
+          type: string
+          title: Requisition No
+        patient_id:
+          type: string
+          format: uuid
+          title: Patient Id
+        source_system:
+          type: string
+          title: Source System
+        priority:
+          type: string
+          title: Priority
+        status:
+          type: string
+          title: Status
+        ordered_at:
+          type: string
+          format: date-time
+          title: Ordered At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - requisition_no
+      - patient_id
+      - source_system
+      - priority
+      - status
+      - ordered_at
+      title: OrderSummary
+    PatientCreateRequest:
+      properties:
+        mrn:
+          type: string
+          title: Mrn
+        given_name:
+          type: string
+          title: Given Name
+        family_name:
+          type: string
+          title: Family Name
+        sex_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sex Code
+        birth_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Birth Date
+      additionalProperties: false
+      type: object
+      required:
+      - mrn
+      - given_name
+      - family_name
+      title: PatientCreateRequest
+    PatientSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        mrn:
+          type: string
+          title: Mrn
+        given_name:
+          type: string
+          title: Given Name
+        family_name:
+          type: string
+          title: Family Name
+        sex_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sex Code
+        birth_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Birth Date
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - mrn
+      - given_name
+      - family_name
+      - created_at
+      title: PatientSummary
+    ProvenanceRecordSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        target_resource_type:
+          type: string
+          title: Target Resource Type
+        target_resource_id:
+          type: string
+          format: uuid
+          title: Target Resource Id
+        activity_code:
+          type: string
+          title: Activity Code
+        based_on_order_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Based On Order Id
+        based_on_order_item_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Based On Order Item Id
+        specimen_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Specimen Id
+        observation_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Observation Id
+        report_version_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Report Version Id
+        device_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+        agent_user_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Agent User Id
+        agent_practitioner_role_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Agent Practitioner Role Id
+        recorded_at:
+          type: string
+          format: date-time
+          title: Recorded At
+        inputs:
+          additionalProperties: true
+          type: object
+          title: Inputs
+        signature:
+          additionalProperties: true
+          type: object
+          title: Signature
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - target_resource_type
+      - target_resource_id
+      - activity_code
+      - recorded_at
+      title: ProvenanceRecordSummary
+    RawInstrumentMessageSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        protocol:
+          type: string
+          title: Protocol
+        direction:
+          $ref: '#/components/schemas/MessageDirection'
+        message_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message Type
+        accession_no:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Accession No
+        specimen_barcode:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Specimen Barcode
+        parser_version:
+          type: string
+          title: Parser Version
+        parsed_ok:
+          type: boolean
+          title: Parsed Ok
+        parse_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Parse Error
+        created_observation_count:
+          type: integer
+          title: Created Observation Count
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - device_id
+      - protocol
+      - direction
+      - parser_version
+      - parsed_ok
+      - created_observation_count
+      - created_at
+      title: RawInstrumentMessageSummary
+    ReceiveSpecimenRequest:
+      properties:
+        received_at:
+          type: string
+          format: date-time
+          title: Received At
+        location_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Location Id
+      additionalProperties: false
+      type: object
+      required:
+      - received_at
+      title: ReceiveSpecimenRequest
+    RejectSpecimenRequest:
+      properties:
+        rejection_reason_code:
+          type: string
+          title: Rejection Reason Code
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+      additionalProperties: false
+      type: object
+      required:
+      - rejection_reason_code
+      title: RejectSpecimenRequest
+    ReportStatus:
+      type: string
+      enum:
+      - registered
+      - partial
+      - preliminary
+      - final
+      - amended
+      - corrected
+      - entered_in_error
+      title: ReportStatus
+    ResultValueType:
+      type: string
+      enum:
+      - quantity
+      - text
+      - coded
+      - boolean
+      - range
+      - attachment
+      title: ResultValueType
+    RoleCode:
+      type: string
+      enum:
+      - admin
+      - accessioner
+      - technician
+      - pathologist
+      - viewer
+      title: RoleCode
+    SpecimenSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        accession_no:
+          type: string
+          title: Accession No
+        order_id:
+          type: string
+          format: uuid
+          title: Order Id
+        patient_id:
+          type: string
+          format: uuid
+          title: Patient Id
+        specimen_type_code:
+          type: string
+          title: Specimen Type Code
+        status:
+          type: string
+          title: Status
+        collected_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Collected At
+        received_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Received At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - accession_no
+      - order_id
+      - patient_id
+      - specimen_type_code
+      - status
+      title: SpecimenSummary
+    SpecimenTraceEvent:
+      properties:
+        event_type:
+          type: string
+          title: Event Type
+        occurred_at:
+          type: string
+          format: date-time
+          title: Occurred At
+        performed_by_user_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Performed By User Id
+        location_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Location Id
+        details:
+          additionalProperties: true
+          type: object
+          title: Details
+      additionalProperties: false
+      type: object
+      required:
+      - event_type
+      - occurred_at
+      title: SpecimenTraceEvent
+    SpecimenTraceResponse:
+      properties:
+        specimen:
+          $ref: '#/components/schemas/SpecimenSummary'
+        events:
+          items:
+            $ref: '#/components/schemas/SpecimenTraceEvent'
+          type: array
+          title: Events
+      additionalProperties: false
+      type: object
+      required:
+      - specimen
+      title: SpecimenTraceResponse
+    TaskActionRequest:
+      properties:
+        owner_user_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Owner User Id
+        owner_practitioner_role_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Owner Practitioner Role Id
+        business_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Business Status
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+        outputs:
+          additionalProperties: true
+          type: object
+          title: Outputs
+      additionalProperties: false
+      type: object
+      title: TaskActionRequest
+    TaskFocusType:
+      type: string
+      enum:
+      - order-item
+      - specimen
+      - observation
+      - report
+      title: TaskFocusType
+    TaskSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        group_identifier:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Group Identifier
+        based_on_order_item_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Based On Order Item Id
+        focus_type:
+          $ref: '#/components/schemas/TaskFocusType'
         focus_id:
           type: string
           format: uuid
+          title: Focus Id
         queue_code:
           type: string
+          title: Queue Code
         status:
           type: string
+          title: Status
         business_status:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Business Status
         priority:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Priority
         owner_user_id:
-          type: string
-          format: uuid
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Owner User Id
         authored_on:
           type: string
           format: date-time
+          title: Authored On
         due_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Due At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - focus_type
+      - focus_id
+      - queue_code
+      - status
+      - authored_on
+      title: TaskSummary
+    TechnicalVerifyObservationRequest:
+      properties:
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+      additionalProperties: false
+      type: object
+      title: TechnicalVerifyObservationRequest
+    TestCatalogCreateRequest:
+      properties:
+        local_code:
+          type: string
+          title: Local Code
+        display_name:
+          type: string
+          title: Display Name
+        kind:
+          $ref: '#/components/schemas/TestCatalogKind'
+          default: orderable
+        loinc_num:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Loinc Num
+        specimen_type_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Specimen Type Code
+        default_ucum:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Default Ucum
+        result_value_type:
+          $ref: '#/components/schemas/ResultValueType'
+          default: quantity
+      additionalProperties: false
+      type: object
+      required:
+      - local_code
+      - display_name
+      title: TestCatalogCreateRequest
+    TestCatalogKind:
+      type: string
+      enum:
+      - orderable
+      - panel
+      - analyte
+      - aoe
+      title: TestCatalogKind
+    TestCatalogSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        local_code:
+          type: string
+          title: Local Code
+        display_name:
+          type: string
+          title: Display Name
+        kind:
+          $ref: '#/components/schemas/TestCatalogKind'
+        loinc_num:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Loinc Num
+        specimen_type_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Specimen Type Code
+        default_ucum:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Default Ucum
+        result_value_type:
+          $ref: '#/components/schemas/ResultValueType'
+        active:
+          type: boolean
+          title: Active
+        created_at:
           type: string
           format: date-time
+          title: Created At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - local_code
+      - display_name
+      - kind
+      - result_value_type
+      - active
+      - created_at
+      title: TestCatalogSummary
+    TokenResponse:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        token_type:
+          type: string
+          title: Token Type
+          default: bearer
+        user:
+          $ref: '#/components/schemas/UserSummary'
+      additionalProperties: false
+      type: object
+      required:
+      - access_token
+      - user
+      title: TokenResponse
+    UserSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        username:
+          type: string
+          title: Username
+        display_name:
+          type: string
+          title: Display Name
+        role_code:
+          $ref: '#/components/schemas/RoleCode'
+        active:
+          type: boolean
+          title: Active
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - username
+      - display_name
+      - role_code
+      - active
+      - created_at
+      title: UserSummary
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer

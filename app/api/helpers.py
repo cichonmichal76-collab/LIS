@@ -12,3 +12,14 @@ def raise_not_implemented(scope: str) -> None:
         ),
     )
 
+
+def bad_request(detail: str) -> None:
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+def not_found(detail: str) -> None:
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+
+
+def conflict(detail: str) -> None:
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)

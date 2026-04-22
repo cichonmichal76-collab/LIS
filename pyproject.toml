@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lis-core"
-version = "0.1.0"
+version = "0.7.0"
 description = "Starter modular monolith for a laboratory information system (LIS)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -12,6 +12,10 @@ dependencies = [
     "fastapi>=0.115,<1.0",
     "uvicorn[standard]>=0.35,<1.0",
     "pydantic>=2.11,<3.0",
+    "sqlalchemy>=2.0.41,<3.0",
+    "PyJWT>=2.10,<3.0",
+    "psycopg[binary]>=3.2,<4.0",
+    "PyYAML>=6.0,<7.0",
 ]
 
 [project.optional-dependencies]
@@ -27,4 +31,3 @@ include = ["app*"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-

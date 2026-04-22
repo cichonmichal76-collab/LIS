@@ -117,7 +117,7 @@ create table test_catalog_member (
     id uuid primary key default gen_random_uuid(),
     parent_test_catalog_id uuid not null references test_catalog(id),
     member_test_catalog_id uuid not null references test_catalog(id),
-    relation_type text not null default 'has-member',
+    relation_type text not null default 'has_member',
     sort_order integer not null default 1,
     min_occurs integer not null default 0,
     max_occurs integer null,
@@ -290,7 +290,7 @@ create table observation_link (
     id uuid primary key default gen_random_uuid(),
     source_observation_id uuid not null references observation(id),
     target_observation_id uuid not null references observation(id),
-    relation_type text not null check (relation_type in ('has-member', 'derived-from', 'triggered-by', 'replaces', 'sequel-to')),
+    relation_type text not null check (relation_type in ('has_member', 'derived_from', 'triggered_by', 'replaces', 'sequel_to')),
     unique (source_observation_id, target_observation_id, relation_type)
 );
 

@@ -3,7 +3,7 @@
 Starter repo for a greenfield LIS v1 built as a modular monolith with:
 
 - `PostgreSQL` as the canonical transactional store
-- `FastAPI` as the internal REST layer and future FHIR facade host
+- `FastAPI` as the internal REST layer and FHIR facade host
 - `OpenAPI` as the checked-in API contract
 - append-only audit and provenance records from day one
 
@@ -11,12 +11,27 @@ Starter repo for a greenfield LIS v1 built as a modular monolith with:
 
 - `db/migrations/0001_lis_core.sql`
   First-pass schema for master data, orders, specimens, tasks, results, reports, audit, and provenance.
+- `db/schema.sql`
+  Canonical target PostgreSQL schema imported from the starter pack and kept as the design target.
+- `db/migrations/postgres/*.sql` and `db/migrations/sqlite/*.sql`
+  Checked-in SQL bootstrap files for the canonical design on PostgreSQL and SQLite,
+  including v6 additions for device mappings, interface logs, autoverification, and ASTM-style support.
 - `openapi/lis-internal-v1.yaml`
-  Internal API contract for the first operational slice: `orders`, `specimens`, and `tasks`.
+  Generated internal API contract for the current implemented slices:
+  `auth`, `patients`, `test-catalog`, `orders`, `specimens`, `tasks`,
+  `observations`, `reports`, `audit`, `provenance`, `devices`, and `integrations`.
+- `openapi/lis-target-v1.yaml`
+  Target API contract for the broader LIS MVP, including `observations`, `reports`, `audit`, and device ingest.
 - `app/`
-  Minimal FastAPI service skeleton with route placeholders aligned to the contract.
-- `docs/architecture.md`
-  Architectural decisions and mapping from relational core to FHIR resources.
+  FastAPI service with working persistence, JWT auth, RBAC, HL7 v2 starter adapter,
+  device gateway, autoverification, ASTM-style drivers, and a read/search FHIR R4 facade.
+- `scripts/`
+  Runtime helpers for schema bootstrap, OpenAPI export, demo seed data, REST smoke flow,
+  FHIR smoke flow, integration smoke flow, autoverification smoke flow, and ASTM smoke flow.
+- `Dockerfile` and `docker-compose.yml`
+  Container path for the API plus PostgreSQL.
+- `docs/`
+  Architecture, workflow, FHIR mapping, repo structure, backlog, and current-vs-target alignment notes.
 
 ## Quick start
 
@@ -27,21 +42,109 @@ python -m pip install -e .[dev]
 uvicorn app.main:app --reload
 ```
 
+Supporting scripts:
+
+```powershell
+python scripts/migrate.py
+python scripts/seed_demo_data.py
+python scripts/export_openapi.py
+python scripts/smoke_test.py
+python scripts/smoke_test_fhir.py
+python scripts/smoke_test_integration.py
+python scripts/smoke_test_autoverification.py
+python scripts/smoke_test_astm.py
+```
+
+PostgreSQL path:
+
+```powershell
+docker compose up --build
+```
+
+Optional runtime config:
+
+- `LIS_DATABASE_URL`
+  Defaults to a local SQLite file at `db/lis.sqlite3` for fast development.
+- `LIS_AUTO_CREATE_SCHEMA`
+  Defaults to `true` and creates the runtime schema on app startup.
+- `LIS_JWT_SECRET`
+  Secret used for bearer token signing.
+- `LIS_JWT_ALGORITHM`
+  Defaults to `HS256`.
+- `LIS_ACCESS_TOKEN_EXPIRE_MINUTES`
+  Defaults to `480`.
+
 ## Current status
 
-This repo is intentionally at the "real starter pack" stage:
+This repo now includes a working persistence slice for:
 
-- schema is defined,
-- API contract is defined,
-- routes are wired,
-- business logic and persistence are not implemented yet.
+- JWT auth and RBAC with `admin`, `accessioner`, `technician`, `pathologist`, and `viewer`,
+- `patients` and `test-catalog`,
+- `orders`, `specimens`, `tasks`, `observations`, and `reports`,
+- `devices`, `device mappings`, `interface messages`, and `raw instrument messages`,
+- rule-based autoverification with evaluate/apply and append-only run history,
+- placeholder report PDF rendering under `/api/v1/reports/{report_id}/pdf`,
+- append-only `audit` and `provenance`,
+- HL7 v2 starter interoperability for inbound/outbound `OML^O33` and `ORU^R01`,
+- device gateway worklists and analyzer result ingest with traceability to `raw_message_id`,
+- ASTM-style worklist export and result import with optional autoverification chaining,
+- FHIR R4 `read` and `search-type` for `Patient`, `ServiceRequest`, `Specimen`,
+  `Task`, `Observation`, `DiagnosticReport`, `AuditEvent`, and `Provenance`,
+- SQLite-first development runtime plus PostgreSQL container path.
 
 That gives a clean baseline for building the next slices without redesigning the core model.
 
+## Current Vs Target
+
+This repository now carries two complementary layers:
+
+- Current implemented slice
+  `app/`, `tests/`, `db/migrations/0001_lis_core.sql`, and `openapi/lis-internal-v1.yaml`
+- Canonical target design
+  `db/schema.sql`, `openapi/lis-target-v1.yaml`, and the planning docs under `docs/`
+
+The current implementation is intentionally narrower than the target design. It already proves the workflow for:
+
+- bootstrap admin, login, and bearer-authenticated access,
+- patient and test catalog master data,
+- order creation and item management,
+- specimen accessioning and lifecycle,
+- work task creation and state transitions,
+- manual observation entry and technical verification,
+- report generation, authorization, and amendment,
+- placeholder PDF retrieval per report version,
+- append-only audit writes and provenance tracking on those transitions,
+- device registry, incoming test code mappings, worklists, and analyzer ingest,
+- autoverification rules, evaluation, apply flow, and manual-review task creation,
+- HL7 v2 order/result import-export for `OML^O33` and `ORU^R01`,
+- ASTM-style worklist export and result ingest,
+- FHIR `CapabilityStatement` plus read/search facade under `/fhir/R4`.
+
+The target design extends that baseline to:
+
+- deeper PostgreSQL-first alignment with canonical target tables,
+- vendor-specific device drivers and richer interface protocols,
+- richer FHIR interoperability such as write interactions, subscriptions, and profiles.
+
 ## Suggested next milestones
 
-1. Add database access and migrations runner integration.
-2. Implement `orders -> accessioning -> specimen lifecycle`.
-3. Add `observations` and `diagnostic_report` workflows.
-4. Introduce a FHIR facade for `ServiceRequest`, `Specimen`, `Task`, `Observation`, and `DiagnosticReport`.
+1. Run the PostgreSQL path end-to-end with migrations and smoke coverage.
+2. Add richer user and practitioner linkage beyond starter RBAC.
+3. Extend interoperability toward vendor-specific drivers, ASTM/CLSI framing, and retry/ACK handling.
+4. Add QC, reflex logic, and richer FHIR features such as writes and subscriptions.
 
+## Design Docs
+
+- [Architecture](docs/architecture.md)
+- [Workflow](docs/workflow.md)
+- [FHIR Facade](docs/fhir-facade.md)
+- [Dependency Tree](docs/dependency-tree.md)
+- [HL7 v2 Adapter](docs/hl7-v2-adapter.md)
+- [Device Gateway](docs/device-gateway.md)
+- [Autoverification Engine](docs/autoverification-engine.md)
+- [ASTM Driver Layer](docs/astm-driver-layer.md)
+- [Validation](docs/validation.md)
+- [FHIR Mapping](docs/fhir-mapping.md)
+- [Repo Structure](docs/repo-structure.md)
+- [Backlog](docs/backlog.md)
+- [Alignment](docs/alignment.md)

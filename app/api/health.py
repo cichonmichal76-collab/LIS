@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
+from app.core.config import APP_VERSION
 from app.schemas.common import HealthResponse
 
 router = APIRouter(tags=["system"])
@@ -16,7 +17,7 @@ def get_health() -> HealthResponse:
     return HealthResponse(
         service="lis-core",
         status="ok",
-        version="0.1.0",
+        version=APP_VERSION,
         contract_path="/openapi/lis-internal-v1.yaml",
     )
 
