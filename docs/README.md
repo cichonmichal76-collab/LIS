@@ -1,37 +1,39 @@
 # `docs/`
 
-Tu znajduje się dokumentacja projektowa i operacyjna repo.
+Tu znajduje sie dokumentacja projektowa i operacyjna repo.
 
-## Najważniejsze pliki
+## Najwazniejsze pliki
 
 - `architecture.md`
   Architektura systemu.
 - `workflow.md`
-  Główny workflow laboratoryjny.
+  Glowny workflow laboratoryjny.
 - `repo-structure.md`
-  Opis aktualnej struktury repo i katalogów.
+  Opis aktualnej struktury repo i katalogow.
 - `dependency-tree.md`
-  Drzewo zależności modułów i warstw w aktualnym kodzie.
+  Drzewo zaleznosci modulow i warstw w aktualnym kodzie.
 - `fhir-facade.md`
-  Granice i sposób działania fasady FHIR.
+  Granice i sposob dzialania fasady FHIR.
 - `hl7-v2-adapter.md`
   Adapter HL7 v2.
 - `device-gateway.md`
-  Device gateway i analiza komunikatów urządzeń.
+  Device gateway i analiza komunikatow urzadzen.
 - `autoverification-engine.md`
   Silnik autoweryfikacji.
 - `astm-driver-layer.md`
   Warstwa ASTM-style.
+- `postgres-e2e.md`
+  Jak uruchomic i sprawdzic pelny przebieg PostgreSQL E2E.
 - `validation.md`
-  Wyniki lokalnej walidacji.
+  Wyniki walidacji lokalnej i dockerowej.
 - `alignment.md`
-  Różnice między target design a aktualnym runtime.
+  Roznice miedzy target design a aktualnym runtime.
 - `backlog.md`
   Kierunki dalszego rozwoju.
 
-## Od czego zacząć
+## Od czego zaczac
 
-Jeśli ktoś wchodzi do projektu pierwszy raz, najlepiej czytać w tej kolejności:
+Jesli ktos wchodzi do projektu pierwszy raz, najlepiej czytac w tej kolejnosci:
 
 1. `architecture.md`
 2. `workflow.md`

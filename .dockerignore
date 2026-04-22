@@ -6,6 +6,5 @@ __pycache__
 db/*.sqlite3
 db/*.db
 data
-tests
 .tmp_compare
 .tmp_v3_review

@@ -16,4 +16,5 @@ class HealthResponse(ApiModel):
     status: str
     version: str
     contract_path: str
-
+    database_backend: str
+    database_status: str

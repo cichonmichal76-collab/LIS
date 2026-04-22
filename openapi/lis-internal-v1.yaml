@@ -6,7 +6,7 @@ info:
     specimen lifecycle, task orchestration, observations, reports, audit, provenance,
     device registry, HL7 v2 integrations, device gateway, autoverification, ASTM-style
     drivers, and a read/search FHIR facade.
-  version: 0.7.0
+  version: 0.7.1
 paths:
   /health:
     get:
@@ -4158,6 +4158,12 @@ components:
         contract_path:
           type: string
           title: Contract Path
+        database_backend:
+          type: string
+          title: Database Backend
+        database_status:
+          type: string
+          title: Database Status
       additionalProperties: false
       type: object
       required:
@@ -4165,6 +4171,8 @@ components:
       - status
       - version
       - contract_path
+      - database_backend
+      - database_status
       title: HealthResponse
     IntegratedObservationSummary:
       properties:

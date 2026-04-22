@@ -202,6 +202,7 @@ def correct_observation(
             reference_interval_snapshot=replacement_payload.reference_interval_snapshot,
         )
         session.add(replacement)
+        session.flush()
         session.add(
             ObservationLinkRecord(
                 id=str(uuid4()),

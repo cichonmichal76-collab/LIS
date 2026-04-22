@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -8,13 +10,31 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.core.security import hash_password
 from app.db.models import UserRecord
+from app.db.runtime import create_temporary_database, ensure_runtime_schema
 from app.main import create_app
 
 
-def make_client(tmp_path, db_name: str) -> TestClient:
-    db_path = tmp_path / db_name
-    app = create_app(Settings(database_url=f"sqlite:///{db_path.as_posix()}"))
-    return TestClient(app)
+@contextmanager
+def make_client(tmp_path, db_name: str):
+    base_database_url = os.getenv("LIS_TEST_DATABASE_URL")
+    cleanup = None
+    if base_database_url:
+        database_url, cleanup = create_temporary_database(base_database_url, db_name)
+        settings = Settings(database_url=database_url, auto_create_schema=False)
+    else:
+        db_path = tmp_path / db_name
+        database_url = f"sqlite:///{db_path.as_posix()}"
+        settings = Settings(database_url=database_url, auto_create_schema=False)
+
+    ensure_runtime_schema(settings.database_url)
+    app = create_app(settings)
+
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        if cleanup is not None:
+            cleanup()
 
 
 def bootstrap_admin(client: TestClient) -> tuple[dict[str, str], dict[str, object]]:

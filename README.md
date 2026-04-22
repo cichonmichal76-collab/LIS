@@ -27,9 +27,12 @@ Starter repo for a greenfield LIS v1 built as a modular monolith with:
   device gateway, autoverification, ASTM-style drivers, and a read/search FHIR R4 facade.
 - `scripts/`
   Runtime helpers for schema bootstrap, OpenAPI export, demo seed data, REST smoke flow,
-  FHIR smoke flow, integration smoke flow, autoverification smoke flow, and ASTM smoke flow.
+  FHIR smoke flow, integration smoke flow, autoverification smoke flow, ASTM smoke flow,
+  database wait/reset helpers, and a smoke matrix runner.
 - `Dockerfile` and `docker-compose.yml`
-  Container path for the API plus PostgreSQL.
+  Container path for the API plus PostgreSQL, including a `test-runner` service for end-to-end validation.
+- `.env.example` and `Makefile`
+  Ready-to-use local env template and common developer commands for migrate/test/smoke/docker flows.
 - `docs/`
   Architecture, workflow, FHIR mapping, repo structure, backlog, and current-vs-target alignment notes.
 
@@ -48,17 +51,22 @@ Supporting scripts:
 python scripts/migrate.py
 python scripts/seed_demo_data.py
 python scripts/export_openapi.py
+python scripts/wait_for_db.py
+python scripts/reset_db.py --migrate
 python scripts/smoke_test.py
 python scripts/smoke_test_fhir.py
 python scripts/smoke_test_integration.py
 python scripts/smoke_test_autoverification.py
 python scripts/smoke_test_astm.py
+python scripts/smoke_test_matrix.py
 ```
 
 PostgreSQL path:
 
 ```powershell
+Copy-Item .env.example .env
 docker compose up --build
+docker compose run --rm test-runner
 ```
 
 Optional runtime config:
@@ -67,6 +75,10 @@ Optional runtime config:
   Defaults to a local SQLite file at `db/lis.sqlite3` for fast development.
 - `LIS_AUTO_CREATE_SCHEMA`
   Defaults to `true` and creates the runtime schema on app startup.
+- `LIS_TEST_DATABASE_URL`
+  Optional base database URL used by pytest to create isolated temporary test databases.
+- `LIS_SMOKE_DATABASE_URL`
+  Optional base database URL used by smoke tests to create isolated temporary smoke databases.
 - `LIS_JWT_SECRET`
   Secret used for bearer token signing.
 - `LIS_JWT_ALGORITHM`
@@ -90,7 +102,8 @@ This repo now includes a working persistence slice for:
 - ASTM-style worklist export and result import with optional autoverification chaining,
 - FHIR R4 `read` and `search-type` for `Patient`, `ServiceRequest`, `Specimen`,
   `Task`, `Observation`, `DiagnosticReport`, `AuditEvent`, and `Provenance`,
-- SQLite-first development runtime plus PostgreSQL container path.
+- dynamic `DATABASE_URL` runtime selection with real database ping in `/health`,
+- SQLite local validation plus PostgreSQL end-to-end validation through `docker compose run --rm test-runner`.
 
 That gives a clean baseline for building the next slices without redesigning the core model.
 
@@ -128,10 +141,10 @@ The target design extends that baseline to:
 
 ## Suggested next milestones
 
-1. Run the PostgreSQL path end-to-end with migrations and smoke coverage.
+1. Add QC engine, Westgard-style rules, and richer delta checks.
 2. Add richer user and practitioner linkage beyond starter RBAC.
 3. Extend interoperability toward vendor-specific drivers, ASTM/CLSI framing, and retry/ACK handling.
-4. Add QC, reflex logic, and richer FHIR features such as writes and subscriptions.
+4. Add richer FHIR features such as writes, subscriptions, and profile validation.
 
 ## Design Docs
 
@@ -143,6 +156,7 @@ The target design extends that baseline to:
 - [Device Gateway](docs/device-gateway.md)
 - [Autoverification Engine](docs/autoverification-engine.md)
 - [ASTM Driver Layer](docs/astm-driver-layer.md)
+- [PostgreSQL E2E](docs/postgres-e2e.md)
 - [Validation](docs/validation.md)
 - [FHIR Mapping](docs/fhir-mapping.md)
 - [Repo Structure](docs/repo-structure.md)

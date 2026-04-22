@@ -493,6 +493,7 @@ def _ensure_review_task(
         inputs_payload={"reasons": reasons, "observation_id": observation.id},
     )
     session.add(task)
+    session.flush()
     return task
 
 

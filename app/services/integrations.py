@@ -1249,6 +1249,7 @@ def _get_or_create_patient(
         birth_date=birth_date,
     )
     session.add(patient)
+    session.flush()
     return patient
 
 
@@ -1275,6 +1276,7 @@ def _get_or_create_order(
         ordered_at=datetime.now(UTC),
     )
     session.add(order)
+    session.flush()
     return order
 
 
@@ -1313,6 +1315,7 @@ def _ensure_order_item(
         aoe_payload={},
     )
     session.add(item)
+    session.flush()
     return item
 
 
@@ -1341,6 +1344,7 @@ def _create_expected_specimen(
         notes=notes,
     )
     session.add(specimen)
+    session.flush()
     session.add(
         SpecimenEventRecord(
             id=str(uuid4()),

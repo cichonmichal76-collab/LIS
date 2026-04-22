@@ -1,6 +1,9 @@
 # Validation
 
-The current repository has been locally validated on the SQLite development path.
+The current repository has been validated on both:
+
+- the local SQLite development path
+- the Docker Compose PostgreSQL path
 
 ## Commands Run
 
@@ -13,8 +16,11 @@ The current repository has been locally validated on the SQLite development path
 .\.venv\Scripts\python.exe scripts\smoke_test_integration.py
 .\.venv\Scripts\python.exe scripts\smoke_test_autoverification.py
 .\.venv\Scripts\python.exe scripts\smoke_test_astm.py
+.\.venv\Scripts\python.exe scripts\smoke_test_matrix.py
 .\.venv\Scripts\python.exe scripts\export_openapi.py
 .\.venv\Scripts\python.exe scripts\migrate.py
+docker compose build test-runner
+docker compose run --rm test-runner
 ```
 
 ## Current Result
@@ -27,8 +33,13 @@ The current repository has been locally validated on the SQLite development path
 - integration smoke: OK
 - autoverification smoke: OK
 - ASTM smoke: OK
+- smoke matrix: OK
 - OpenAPI export: OK
 - runtime schema bootstrap: OK
+- PostgreSQL Compose E2E: OK
+  - `wait_for_db.py`: OK
+  - `pytest -q`: `14 passed`
+  - `smoke_test_matrix.py`: OK
 
 ## Checked-In SQL Migration Validation
 
@@ -41,5 +52,6 @@ Result: OK.
 
 ## Current Boundary
 
-- the PostgreSQL path is prepared in code, checked-in SQL, dependencies, and `docker-compose`
-- full end-to-end runtime execution against a live PostgreSQL container was not run in this validation step
+- runtime and smoke coverage are proven end-to-end on PostgreSQL through Docker Compose
+- canonical checked-in SQL migrations for PostgreSQL are present, but the runtime app still bootstraps its current operational schema from SQLAlchemy metadata
+- production deployment hardening, QC, advanced analyzer transport, and broader clinical rule coverage are still outside this validation step

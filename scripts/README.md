@@ -2,14 +2,20 @@
 
 Ten katalog zawiera skrypty pomocnicze do uruchamiania i sprawdzania projektu.
 
-## Co jest w środku
+## Co jest w srodku
 
 - `migrate.py`
   Tworzy runtime schema aplikacji.
+- `reset_db.py`
+  Czysci baze SQLite albo PostgreSQL; opcjonalnie od razu odtwarza runtime schema.
+- `wait_for_db.py`
+  Czeka az baza odpowie, przydatne w Docker Compose i CI.
 - `seed_demo_data.py`
-  Ładuje dane demonstracyjne.
+  Laduje dane demonstracyjne.
 - `export_openapi.py`
   Eksportuje aktualny kontrakt OpenAPI z aplikacji.
+- `_smoke_support.py`
+  Wspolne helpery dla smoke testow SQLite i PostgreSQL.
 - `smoke_test.py`
   Podstawowy smoke test backendu LIS.
 - `smoke_test_fhir.py`
@@ -20,7 +26,9 @@ Ten katalog zawiera skrypty pomocnicze do uruchamiania i sprawdzania projektu.
   Smoke test autoweryfikacji.
 - `smoke_test_astm.py`
   Smoke test warstwy ASTM-style.
+- `smoke_test_matrix.py`
+  Uruchamia komplet smoke testow po kolei.
 
 ## Zastosowanie
 
-To są skrypty operacyjne dla dewelopera. Pozwalają szybko sprawdzić, czy aplikacja nadal działa po zmianach bez odpalania pełnego środowiska produkcyjnego.
+To sa skrypty operacyjne dla dewelopera. Pozwalaja szybko sprawdzic, czy aplikacja nadal dziala po zmianach bez odpalania calego srodowiska produkcyjnego.

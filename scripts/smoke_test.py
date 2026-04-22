@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
-from fastapi.testclient import TestClient
-
-from app.main import create_app
+from _smoke_support import make_smoke_client
 
 __test__ = False
-
-ROOT = Path(__file__).resolve().parents[1]
-SMOKE_DB = ROOT / "data" / "smoke_test.sqlite3"
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -18,14 +12,9 @@ def _headers(token: str) -> dict[str, str]:
 
 
 def main() -> None:
-    SMOKE_DB.parent.mkdir(parents=True, exist_ok=True)
-    if SMOKE_DB.exists():
-        SMOKE_DB.unlink()
+    os.environ.pop("LIS_DATABASE_URL", None)
 
-    os.environ["LIS_DATABASE_URL"] = f"sqlite:///{SMOKE_DB.as_posix()}"
-    app = create_app()
-
-    with TestClient(app) as client:
+    with make_smoke_client("smoke_test") as client:
         bootstrap = client.post(
             "/api/v1/auth/bootstrap-admin",
             json={

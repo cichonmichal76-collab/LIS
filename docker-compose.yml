@@ -1,29 +1,56 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_DB: lis
-      POSTGRES_USER: lis
-      POSTGRES_PASSWORD: lis
+      POSTGRES_DB: ${POSTGRES_DB:-lis}
+      POSTGRES_USER: ${POSTGRES_USER:-lis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lis}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
 
   api:
     build:
       context: .
     environment:
-      LIS_DATABASE_URL: postgresql+psycopg://lis:lis@db:5432/lis
-      LIS_JWT_SECRET: change-me-in-prod
-      LIS_ACCESS_TOKEN_EXPIRE_MINUTES: "480"
+      LIS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/${POSTGRES_DB:-lis}
       LIS_AUTO_CREATE_SCHEMA: "false"
+      LIS_JWT_SECRET: ${LIS_JWT_SECRET:-change-me-in-prod}
+      LIS_ACCESS_TOKEN_EXPIRE_MINUTES: ${LIS_ACCESS_TOKEN_EXPIRE_MINUTES:-480}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"
+    command: >
+      sh -c "python scripts/wait_for_db.py &&
+             python scripts/migrate.py &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  test-runner:
+    build:
+      context: .
+    environment:
+      LIS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/${POSTGRES_DB:-lis}
+      LIS_TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/postgres
+      LIS_SMOKE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/postgres
+      LIS_AUTO_CREATE_SCHEMA: "false"
+      LIS_JWT_SECRET: ${LIS_JWT_SECRET:-change-me-in-prod}
+      LIS_ACCESS_TOKEN_EXPIRE_MINUTES: ${LIS_ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python scripts/wait_for_db.py --database-url postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/postgres &&
+             pytest -q &&
+             python scripts/smoke_test_matrix.py"
 
 volumes:
   postgres_data:
