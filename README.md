@@ -16,7 +16,11 @@ Starter repo for a greenfield LIS v1 built as a modular monolith with:
 - `db/migrations/postgres/*.sql` and `db/migrations/sqlite/*.sql`
   Checked-in SQL bootstrap files for the canonical design on PostgreSQL and SQLite,
   including v10 additions for device mappings, interface logs, autoverification,
-  QC engine, ASTM-style support, analyzer transport, and analyzer runtime.
+  QC engine, ASTM-style support, analyzer transport, analyzer runtime,
+  and v12 runtime lease/backoff hardening.
+- `db/runtime_bootstrap/*.sql`
+  Checked-in runtime bootstrap SQL generated from `app/db/models.py` and used by the
+  v13 `runtime-sql` bootstrap path for the current operational schema.
 - `openapi/lis-internal-v1.yaml`
   Generated internal API contract for the current implemented slices:
   `auth`, `patients`, `test-catalog`, `orders`, `specimens`, `tasks`,
@@ -27,17 +31,19 @@ Starter repo for a greenfield LIS v1 built as a modular monolith with:
 - `app/`
   FastAPI service with working persistence, JWT auth, RBAC, HL7 v2 starter adapter,
   device gateway, autoverification, QC engine, ASTM-style drivers, analyzer transport
-  sessions, a background analyzer runtime, and a read/search FHIR R4 facade.
+  sessions, a hardened background analyzer runtime, and a read/search FHIR R4 facade.
 - `scripts/`
   Runtime helpers for schema bootstrap, OpenAPI export, demo seed data, REST smoke flow,
   FHIR smoke flow, integration smoke flow, autoverification smoke flow, ASTM smoke flow,
-  analyzer transport smoke flow, analyzer runtime smoke flow, database wait/reset helpers,
-  and a smoke matrix runner.
+  analyzer transport smoke flow, analyzer runtime smoke flow, runtime bootstrap export,
+  SQL artifact validation, database wait/reset helpers, and a smoke matrix runner.
 - `Dockerfile` and `docker-compose.yml`
   Container path for the API, analyzer runtime, and PostgreSQL, including a `test-runner`
   service for end-to-end validation.
 - `.env.example` and `Makefile`
   Ready-to-use local env template and common developer commands for migrate/test/smoke/docker flows.
+- `.github/workflows/ci.yml`
+  CI for SQLite and PostgreSQL validation, including pytest, smoke matrix, and runtime bootstrap checks.
 - `docs/`
   Architecture, workflow, FHIR mapping, repo structure, backlog, and current-vs-target alignment notes.
 
@@ -54,8 +60,11 @@ Supporting scripts:
 
 ```powershell
 python scripts/migrate.py
+python scripts/export_runtime_bootstrap.py
+python scripts/export_runtime_bootstrap.py --check
 python scripts/seed_demo_data.py
 python scripts/export_openapi.py
+python scripts/validate_sql_artifacts.py
 python scripts/wait_for_db.py
 python scripts/reset_db.py --migrate
 python scripts/smoke_test.py
@@ -83,7 +92,9 @@ Optional runtime config:
 - `LIS_DATABASE_URL`
   Defaults to a local SQLite file at `db/lis.sqlite3` for fast development.
 - `LIS_AUTO_CREATE_SCHEMA`
-  Defaults to `true` and creates the runtime schema on app startup.
+  Defaults to `true` and bootstraps the runtime schema on app startup.
+- `LIS_SCHEMA_BOOTSTRAP_MODE`
+  Defaults to `runtime-sql`. Supported values: `runtime-sql`, `metadata`, `none`.
 - `LIS_TEST_DATABASE_URL`
   Optional base database URL used by pytest to create isolated temporary test databases.
 - `LIS_SMOKE_DATABASE_URL`
@@ -116,10 +127,14 @@ This repo now includes a working persistence slice for:
 - analyzer transport profiles, sessions, outbound queue, ASTM framing,
   `ENQ`/`ACK`/`NAK`/`EOT`, retry handling, frame logs, and dispatch into ASTM import,
 - analyzer runtime worker with `mock`, `tcp-client`, and `serial` connector modes,
-  plus a dedicated Docker Compose service for background transport processing,
+  lease ownership, retry backoff, runtime overview API,
+  and a dedicated Docker Compose service for background transport processing,
+- runtime bootstrap SQL generated from ORM metadata and used by `scripts/migrate.py`,
+- SQLite and PostgreSQL CI coverage through GitHub Actions,
 - FHIR R4 `read` and `search-type` for `Patient`, `ServiceRequest`, `Specimen`,
   `Task`, `Observation`, `DiagnosticReport`, `AuditEvent`, and `Provenance`,
 - dynamic `DATABASE_URL` runtime selection with real database ping in `/health`,
+- explicit runtime schema bootstrap modes with `runtime-sql` as the preferred checked-in path,
 - SQLite local validation, plus a documented PostgreSQL end-to-end path through
   `docker compose run --rm test-runner` when Docker is available.
 
@@ -157,14 +172,14 @@ The target design extends that baseline to:
 
 - deeper PostgreSQL-first alignment with canonical target tables,
 - vendor-specific device drivers and richer interface protocols,
-- richer connection recovery, leader/lease coordination, and production hardening for the analyzer runtime,
+- richer connection recovery, deeper replay/dead-letter handling, and production hardening for the analyzer runtime,
 - deeper QC coverage such as richer Westgard/trend rules and operational QC scheduling,
 - richer FHIR interoperability such as write interactions, subscriptions, and profiles.
 
 ## Suggested next milestones
 
-1. Add multi-level QC, richer trend rules, and deeper clinical/autoverification context.
-2. Harden analyzer runtime with reconnection, monitoring, and multi-worker coordination.
+1. Add deeper replay/dead-letter handling, reconnect policies, and runtime metrics export.
+2. Add multi-level QC, richer trend rules, and deeper clinical/autoverification context.
 3. Add richer user and practitioner linkage beyond starter RBAC.
 4. Add richer FHIR features such as writes, subscriptions, and profile validation.
 

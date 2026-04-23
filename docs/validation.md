@@ -1,6 +1,6 @@
 # Validation
 
-The current repository has been revalidated in this v11 step on:
+The current repository has been revalidated in this v13 step on:
 
 - the local SQLite development path
 
@@ -9,49 +9,23 @@ The current repository has been revalidated in this v11 step on:
 ```powershell
 .\.venv\Scripts\ruff.exe check app tests scripts
 .\.venv\Scripts\python.exe -m compileall app scripts tests
+.\.venv\Scripts\python.exe scripts\export_runtime_bootstrap.py --check
+.\.venv\Scripts\python.exe scripts\validate_sql_artifacts.py
 .\.venv\Scripts\pytest.exe -q
-.\.venv\Scripts\python.exe scripts\smoke_test.py
-.\.venv\Scripts\python.exe scripts\smoke_test_fhir.py
-.\.venv\Scripts\python.exe scripts\smoke_test_integration.py
-.\.venv\Scripts\python.exe scripts\smoke_test_autoverification.py
-.\.venv\Scripts\python.exe scripts\smoke_test_astm.py
-.\\.venv\\Scripts\\python.exe scripts\\smoke_test_qc.py
-.\.venv\Scripts\python.exe scripts\smoke_test_transport.py
-.\.venv\Scripts\python.exe scripts\analyzer_runtime.py --once
-.\.venv\Scripts\python.exe scripts\smoke_test_runtime.py
 .\.venv\Scripts\python.exe scripts\smoke_test_matrix.py
+.\.venv\Scripts\python.exe scripts\analyzer_runtime.py --once
 .\.venv\Scripts\python.exe scripts\export_openapi.py
-.\.venv\Scripts\python.exe scripts\migrate.py
-@'
-import sqlite3
-from pathlib import Path
-
-root = Path(r'C:/Users/cicho/OneDrive/Pulpit/LIS')
-db_path = root / 'db' / 'validation_qc.sqlite3'
-if db_path.exists():
-    db_path.unlink()
-conn = sqlite3.connect(db_path)
-try:
-    for rel in [
-        'db/migrations/sqlite/0001_init.sql',
-        'db/migrations/sqlite/002_autoverification_astm.sql',
-        'db/migrations/sqlite/003_analyzer_transport.sql',
-        'db/migrations/sqlite/004_analyzer_runtime_profile.sql',
-        'db/migrations/sqlite/005_qc_engine.sql',
-    ]:
-        sql = (root / rel).read_text(encoding='utf-8')
-        conn.executescript(sql)
-    conn.commit()
-finally:
-    conn.close()
-'@ | .\.venv\Scripts\python.exe -
+if (Test-Path data\v13_runtime_migrate.sqlite3) { Remove-Item data\v13_runtime_migrate.sqlite3 -Force }
+.\.venv\Scripts\python.exe scripts\migrate.py --database-url sqlite:///C:/Users/cicho/OneDrive/Pulpit/LIS/data/v13_runtime_migrate.sqlite3 --mode runtime-sql
 ```
 
 ## Current Result
 
 - lint: OK
 - compile: OK
-- pytest: `23 passed`
+- runtime bootstrap SQL snapshot check: OK
+- checked-in SQL artifact validation: OK
+- pytest: `26 passed`
 - core smoke: OK
 - FHIR smoke: OK
 - integration smoke: OK
@@ -59,46 +33,42 @@ finally:
 - ASTM smoke: OK
 - QC smoke: OK
 - analyzer transport smoke: OK
-- analyzer runtime one-shot: OK
 - analyzer runtime smoke: OK
 - smoke matrix: OK
+- analyzer runtime one-shot: OK
 - OpenAPI export: OK
-- runtime schema bootstrap: OK
+- runtime schema bootstrap (`runtime-sql`): OK
 
 ## PostgreSQL E2E
 
 The PostgreSQL Compose path remains available and documented in [PostgreSQL E2E](postgres-e2e.md).
 
-For this v11 QC-and-autoverification step, the locally re-run validation in this environment was completed on:
+For this v13 PostgreSQL-first and CI step, the locally re-run validation in this environment was completed on:
 
 - SQLite runtime
 - full pytest
 - full smoke matrix
-- QC-specific smoke flow
-- advanced autoverification rule coverage through pytest
-- transport-specific smoke flow
-- analyzer runtime flow
+- runtime SQL snapshot verification
+- checked-in SQL artifact verification
 
 A Docker Compose rerun was not completed on 2026-04-23 because the Docker daemon was not running in
 this environment.
 
-## Checked-In SQL Migration Validation
+## Checked-In SQL Validation
 
-The checked-in canonical SQLite migrations were also executed on a clean SQLite file in sequence:
+Two SQL layers were verified in this step:
 
-- `db/migrations/sqlite/0001_init.sql`
-- `db/migrations/sqlite/002_autoverification_astm.sql`
-- `db/migrations/sqlite/003_analyzer_transport.sql`
-- `db/migrations/sqlite/004_analyzer_runtime_profile.sql`
-- `db/migrations/sqlite/005_qc_engine.sql`
+- runtime bootstrap SQL under `db/runtime_bootstrap/*.sql`
+- canonical SQLite target migrations under `db/migrations/sqlite/*.sql`
 
 Result: OK.
 
 ## Current Boundary
 
-- runtime and smoke coverage are proven end-to-end on SQLite in this v11 step
-- PostgreSQL E2E remains documented and available, but was not re-run in this environment on 2026-04-23 because Docker was unavailable
-- canonical checked-in SQL migrations for PostgreSQL are present, but the runtime app still bootstraps its current operational schema from SQLAlchemy metadata
-- analyzer transport sessions, framing, ACK/NAK, retry, and dispatch are covered, but physical TCP/serial analyzer I/O is still outside this validation step
+- runtime and smoke coverage are proven end-to-end on SQLite in this v13 step
+- PostgreSQL E2E remains documented and wired into Compose and CI, but was not re-run in this local environment on 2026-04-23 because Docker was unavailable
+- runtime schema bootstrap is now checked in and validated, but it is still snapshot-based rather than a full revisioned runtime migration framework
+- existing older local databases may still require `reset_db.py --migrate` because `runtime-sql` is a bootstrap snapshot, not a full in-place upgrader
+- canonical target migrations and runtime bootstrap SQL now coexist intentionally; they solve different problems and still require discipline to keep aligned
 - analyzer runtime worker is covered on the mock connector path, while real TCP and serial devices still require environment-specific validation
-- production deployment hardening and broader multi-level clinical/QC rule coverage are still outside this validation step
+- production deployment hardening, replay/dead-letter flow, and exported runtime metrics are still outside this validation step

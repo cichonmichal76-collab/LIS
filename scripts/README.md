@@ -5,7 +5,11 @@ Ten katalog zawiera skrypty pomocnicze do uruchamiania i sprawdzania projektu.
 ## Co jest w srodku
 
 - `migrate.py`
-  Tworzy runtime schema aplikacji.
+  Bootstrappuje runtime schema aplikacji w trybie `runtime-sql`, `metadata` albo `none`.
+- `export_runtime_bootstrap.py`
+  Generuje albo sprawdza checked-in snapshoty `db/runtime_bootstrap/*.sql`.
+- `validate_sql_artifacts.py`
+  Sprawdza lokalnie runtime bootstrap SQL oraz kanoniczne migracje SQLite.
 - `reset_db.py`
   Czysci baze SQLite albo PostgreSQL; opcjonalnie od razu odtwarza runtime schema.
 - `wait_for_db.py`

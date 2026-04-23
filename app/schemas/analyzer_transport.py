@@ -118,6 +118,12 @@ class AnalyzerTransportSessionSummary(ApiModel):
     outbound_message_id: UUID | None = None
     inbound_message_id: UUID | None = None
     expected_inbound_frame_no: int
+    lease_owner: str | None = None
+    lease_acquired_at: datetime | None = None
+    lease_expires_at: datetime | None = None
+    heartbeat_at: datetime | None = None
+    failure_count: int = 0
+    next_retry_at: datetime | None = None
     last_error: str | None = None
     last_activity_at: datetime
     created_at: datetime
@@ -277,6 +283,16 @@ class AnalyzerTransportListMessagesResponse(ApiModel):
 
 class AnalyzerTransportListFramesResponse(ApiModel):
     items: list[AnalyzerTransportFrameLogSummary] = Field(default_factory=list)
+
+
+class AnalyzerTransportRuntimeOverview(ApiModel):
+    profile_count: int
+    session_count: int
+    leased_session_count: int
+    stale_lease_count: int
+    backoff_session_count: int
+    error_session_count: int
+    items: list[AnalyzerTransportSessionSummary] = Field(default_factory=list)
 
 
 class AnalyzerTransportDebugSnapshot(ApiModel):

@@ -1,6 +1,6 @@
 PYTHON ?= python
 
-.PHONY: migrate reset-db wait-db test smoke smoke-matrix export-openapi runtime docker-up docker-test-postgres
+.PHONY: migrate reset-db wait-db test smoke smoke-matrix export-openapi export-runtime-bootstrap validate-sql-artifacts runtime docker-up docker-test-postgres
 
 migrate:
 	$(PYTHON) scripts/migrate.py
@@ -22,6 +22,12 @@ smoke-matrix:
 
 export-openapi:
 	$(PYTHON) scripts/export_openapi.py
+
+export-runtime-bootstrap:
+	$(PYTHON) scripts/export_runtime_bootstrap.py
+
+validate-sql-artifacts:
+	$(PYTHON) scripts/validate_sql_artifacts.py
 
 runtime:
 	$(PYTHON) scripts/analyzer_runtime.py

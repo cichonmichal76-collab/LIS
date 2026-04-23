@@ -6,7 +6,7 @@ info:
     specimen lifecycle, task orchestration, observations, reports, audit, provenance,
     device registry, HL7 v2 integrations, device gateway, autoverification, QC engine,
     ASTM-style drivers, analyzer transport sessions, and a read/search FHIR facade.
-  version: 0.11.0
+  version: 0.13.0
 paths:
   /health:
     get:
@@ -917,6 +917,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalyzerTransportListSessionsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/analyzer-transport/runtime/overview:
+    get:
+      tags:
+      - analyzer-transport
+      summary: Get Runtime Overview
+      operationId: get_runtime_overview_api_v1_analyzer_transport_runtime_overview_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzerTransportRuntimeOverview'
         '422':
           description: Validation Error
           content:
@@ -4677,6 +4708,41 @@ components:
       required:
       - framed_payload
       title: AnalyzerTransportReceiveFrameRequest
+    AnalyzerTransportRuntimeOverview:
+      properties:
+        profile_count:
+          type: integer
+          title: Profile Count
+        session_count:
+          type: integer
+          title: Session Count
+        leased_session_count:
+          type: integer
+          title: Leased Session Count
+        stale_lease_count:
+          type: integer
+          title: Stale Lease Count
+        backoff_session_count:
+          type: integer
+          title: Backoff Session Count
+        error_session_count:
+          type: integer
+          title: Error Session Count
+        items:
+          items:
+            $ref: '#/components/schemas/AnalyzerTransportSessionSummary'
+          type: array
+          title: Items
+      additionalProperties: false
+      type: object
+      required:
+      - profile_count
+      - session_count
+      - leased_session_count
+      - stale_lease_count
+      - backoff_session_count
+      - error_session_count
+      title: AnalyzerTransportRuntimeOverview
     AnalyzerTransportSessionCreateRequest:
       properties:
         device_id:
@@ -4735,6 +4801,39 @@ components:
         expected_inbound_frame_no:
           type: integer
           title: Expected Inbound Frame No
+        lease_owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Lease Owner
+        lease_acquired_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Lease Acquired At
+        lease_expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Lease Expires At
+        heartbeat_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Heartbeat At
+        failure_count:
+          type: integer
+          title: Failure Count
+          default: 0
+        next_retry_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Next Retry At
         last_error:
           anyOf:
           - type: string

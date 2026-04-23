@@ -183,6 +183,17 @@ def main() -> None:
             assert stats.dispatches == 1
             assert stats.errors == []
 
+            overview = client.get(
+                "/api/v1/analyzer-transport/runtime/overview",
+                headers=auth_headers,
+                params={"device_id": device_id},
+            )
+            assert overview.status_code == 200, overview.text
+            overview_payload = overview.json()
+            assert overview_payload["profile_count"] == 1
+            assert overview_payload["session_count"] == 1
+            assert overview_payload["leased_session_count"] == 1
+
             observations = client.get(
                 "/api/v1/observations",
                 headers=auth_headers,

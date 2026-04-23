@@ -1,6 +1,7 @@
 # Analyzer Runtime
 
-Ten dokument opisuje v9, czyli osobny runtime analizatorow dzialajacy poza request lifecycle API.
+Ten dokument opisuje v9-v12, czyli osobny runtime analizatorow dzialajacy poza request lifecycle API
+oraz jego pozniejsze utwardzenie operacyjne.
 
 ## Po co ten etap
 
@@ -70,6 +71,25 @@ Profil transportowy przechowuje teraz nie tylko framing i retry, ale tez konfigu
 
 Dzieki temu worker moze dzialac na podstawie danych zapisanych w bazie, a nie tylko na twardo zakodowanych parametrach.
 
+## Co dochodzi w v12
+
+V12 utwardza runtime bez wymagania fizycznego analizatora.
+
+Dochodzi:
+
+- lease ownership dla sesji transportowych,
+- heartbeat i lease expiry,
+- retry backoff po bledach runtime,
+- reset konektora po bledzie,
+- runtime overview API pod `/api/v1/analyzer-transport/runtime/overview`,
+- dodatkowe checked-in migracje dla lease/backoff.
+
+To pozwala bezpieczniej uruchamiac wiecej niz jeden worker i odroznic:
+
+- sesje aktualnie obslugiwane,
+- sesje z wygaslym lease,
+- sesje czekajace w backoff po bledzie.
+
 ## Jak worker dziala
 
 ### Inbound
@@ -106,6 +126,31 @@ Po wyslaniu:
 - przekazuje `ACK` lub `NAK` do warstwy transportowej,
 - albo po przekroczeniu deadline wywoluje timeout.
 
+### Lease i backoff
+
+Kazdy cykl worker:
+
+1. probuje przejac lease dla sesji,
+2. pomija sesje z aktywnym lease innego workera,
+3. pomija sesje, ktore sa jeszcze w `next_retry_at`,
+4. odswieza heartbeat dla sesji, ktora sam posiada,
+5. po sukcesie zeruje `failure_count` i czyści `next_retry_at`,
+6. po bledzie ustawia `session_status=error`, inkrementuje `failure_count`
+   i wylicza rosnacy backoff.
+
+Przy zamknieciu workera jego lease sa zwalniane.
+
+### Runtime overview
+
+Endpoint `/api/v1/analyzer-transport/runtime/overview` pokazuje aktualny stan runtime:
+
+- liczbe profili,
+- liczbe sesji,
+- liczbe aktywnych lease,
+- liczbe wygaslych lease,
+- liczbe sesji w backoff,
+- liczbe sesji w stanie `error`.
+
 ## Testy i smoke
 
 Ten etap ma osobne potwierdzenie dzialania:
@@ -119,10 +164,13 @@ Testy obejmuja:
 - inbound `ENQ + ASTM frame + EOT`
 - dispatch do importu ASTM
 - finalizacje observation przez autoweryfikacje
+- respektowanie aktywnego lease i przejecie lease wygaslego
+- backoff po bledzie runtime
+- runtime overview z licznikami lease/backoff/error
 
 ## Docker Compose
 
-W [docker-compose.yml](C:/Users/cicho/OneDrive/Pulpit/LIS/docker-compose.yml) jest teraz osobny serwis:
+W [docker-compose.yml](C:/Users/cicho/OneDrive/Pulpit/LIS/docker-compose.yml) jest osobny serwis:
 
 - `analyzer-runtime`
 
@@ -141,10 +189,10 @@ To nadal nie jest pelny, produkcyjny driver analizatora.
 Brakuje jeszcze:
 
 - lepszej rekoneksji i recovery po rozlaczeniach,
-- bardziej rozbudowanego scheduler/lease modelu dla wielu workerow,
+- bardziej rozbudowanego replay/dead-letter flow,
 - potwierdzonej sciezki `pyserial`,
 - bogatszej obslugi framingu i site-specific wariantow protokolow,
-- monitoringu i metrics dla stalego runtime.
+- eksportu metrics i stalego monitoringu runtime.
 
-Najuczciwiej: v9 daje dzialajacy background worker i abstrakcje fizycznego I/O,
+Najuczciwiej: v12 daje dzialajacy background worker z leasingiem, backoff i overview API,
 ale nie jest jeszcze finalnym, produkcyjnym middleware analyzerowym.

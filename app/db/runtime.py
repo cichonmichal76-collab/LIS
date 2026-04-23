@@ -6,11 +6,15 @@ from uuid import uuid4
 from collections.abc import Callable
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.engine import Engine, make_url
+from sqlalchemy.schema import CreateIndex, CreateTable
 
 from app.db.base import Base
 
 ROOT = Path(__file__).resolve().parents[2]
+RUNTIME_BOOTSTRAP_ROOT = ROOT / "db" / "runtime_bootstrap"
+RUNTIME_BOOTSTRAP_MODES = {"runtime-sql", "metadata", "none"}
 
 
 def detect_database_backend(database_url: str) -> str:
@@ -43,14 +47,92 @@ def ping_database(database_url: str) -> None:
         engine.dispose()
 
 
-def ensure_runtime_schema(database_url: str) -> None:
+def ensure_runtime_schema(database_url: str, *, mode: str = "runtime-sql") -> None:
+    normalized_mode = normalize_runtime_bootstrap_mode(mode)
+    if normalized_mode == "none":
+        return
+    if normalized_mode == "runtime-sql":
+        apply_runtime_bootstrap(database_url)
+        return
+    if normalized_mode == "metadata":
+        from app.db import models as _models  # noqa: F401
+
+        engine = create_runtime_engine(database_url)
+        try:
+            Base.metadata.create_all(engine)
+        finally:
+            engine.dispose()
+        return
+    raise ValueError(f"Unsupported runtime bootstrap mode: {mode}")
+
+
+def normalize_runtime_bootstrap_mode(mode: str | None) -> str:
+    normalized = (mode or "runtime-sql").strip().lower()
+    if normalized not in RUNTIME_BOOTSTRAP_MODES:
+        raise ValueError(
+            f"Unsupported runtime bootstrap mode: {mode}. "
+            f"Expected one of {sorted(RUNTIME_BOOTSTRAP_MODES)}."
+        )
+    return normalized
+
+
+def runtime_bootstrap_path(database_url: str) -> Path:
+    backend = detect_database_backend(database_url)
+    return runtime_bootstrap_path_for_backend(backend)
+
+
+def runtime_bootstrap_path_for_backend(backend: str) -> Path:
+    if backend == "sqlite":
+        return RUNTIME_BOOTSTRAP_ROOT / "sqlite.sql"
+    if backend == "postgresql":
+        return RUNTIME_BOOTSTRAP_ROOT / "postgres.sql"
+    raise ValueError(f"Unsupported database backend for runtime bootstrap: {backend}")
+
+
+def render_runtime_bootstrap_sql(backend: str) -> str:
     from app.db import models as _models  # noqa: F401
 
-    engine = create_runtime_engine(database_url)
-    try:
-        Base.metadata.create_all(engine)
-    finally:
-        engine.dispose()
+    if backend == "sqlite":
+        dialect = sqlite.dialect()
+    elif backend == "postgresql":
+        dialect = postgresql.dialect()
+    else:
+        raise ValueError(f"Unsupported database backend for runtime bootstrap rendering: {backend}")
+
+    statements: list[str] = [
+        f"-- Generated runtime bootstrap for {backend}.",
+        "-- Source of truth: app/db/models.py",
+        "",
+    ]
+    for table in Base.metadata.sorted_tables:
+        statements.append(str(CreateTable(table, if_not_exists=True).compile(dialect=dialect)).strip() + ";")
+        for index in sorted(table.indexes, key=lambda item: item.name or ""):
+            statements.append(str(CreateIndex(index, if_not_exists=True).compile(dialect=dialect)).strip() + ";")
+        statements.append("")
+    return "\n".join(statements).rstrip() + "\n"
+
+
+def write_runtime_bootstrap_sql(backend: str) -> Path:
+    target = runtime_bootstrap_path_for_backend(backend)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(render_runtime_bootstrap_sql(backend), encoding="utf-8")
+    return target
+
+
+def apply_runtime_bootstrap(database_url: str) -> Path:
+    path = runtime_bootstrap_path(database_url)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Runtime bootstrap SQL was not found for {database_url}. Expected {path}."
+        )
+    backend = detect_database_backend(database_url)
+    if backend == "sqlite":
+        _apply_sqlite_migrations(database_url, [path])
+    elif backend == "postgresql":
+        _apply_postgres_migrations(database_url, [path])
+    else:
+        raise ValueError(f"Unsupported database backend for runtime bootstrap: {database_url}")
+    return path
 
 
 def apply_sql_migrations(database_url: str) -> list[Path]:

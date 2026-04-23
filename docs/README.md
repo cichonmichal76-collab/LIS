@@ -28,6 +28,8 @@ Tu znajduje sie dokumentacja projektowa i operacyjna repo.
   Warstwa transportowa analizatorow: sesje, ramki, ACK/NAK i retry.
 - `analyzer-runtime.md`
   Background worker analizatorow i konektory mock/TCP/serial.
+- `runtime-bootstrap.md`
+  Jak dziala `runtime-sql`, snapshoty `db/runtime_bootstrap/*.sql` i tryby bootstrapu.
 - `postgres-e2e.md`
   Jak uruchomic i sprawdzic pelny przebieg PostgreSQL E2E.
 - `validation.md`

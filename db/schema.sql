@@ -517,6 +517,12 @@ create table analyzer_transport_session (
     outbound_message_id uuid null,
     inbound_message_id uuid null,
     expected_inbound_frame_no int not null default 1,
+    lease_owner text null,
+    lease_acquired_at timestamptz null,
+    lease_expires_at timestamptz null,
+    heartbeat_at timestamptz null,
+    failure_count int not null default 0,
+    next_retry_at timestamptz null,
     last_error text null,
     last_activity_at timestamptz not null default now(),
     created_at timestamptz not null default now(),
@@ -573,6 +579,8 @@ create table analyzer_transport_frame_log (
 
 create index idx_transport_profile_device on analyzer_transport_profile(device_id, active);
 create index idx_transport_session_device on analyzer_transport_session(device_id, created_at);
+create index idx_transport_session_lease on analyzer_transport_session(lease_owner, lease_expires_at);
+create index idx_transport_session_retry on analyzer_transport_session(next_retry_at, session_status);
 create index idx_transport_message_session on analyzer_transport_message(session_id, direction, transport_status, created_at);
 create index idx_transport_frame_session on analyzer_transport_frame_log(session_id, created_at);
 create index idx_transport_frame_message on analyzer_transport_frame_log(message_id, created_at);

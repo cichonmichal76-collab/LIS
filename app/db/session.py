@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.db.base import Base
+from app.db.runtime import ensure_runtime_schema, normalize_runtime_bootstrap_mode
 
 
 class DatabaseSessionManager:
@@ -22,10 +22,8 @@ class DatabaseSessionManager:
             class_=Session,
         )
 
-    def create_schema(self) -> None:
-        from app.db import models as _models  # noqa: F401
-
-        Base.metadata.create_all(self.engine)
+    def create_schema(self, *, mode: str = "runtime-sql") -> None:
+        ensure_runtime_schema(self.database_url, mode=normalize_runtime_bootstrap_mode(mode))
 
     def dispose(self) -> None:
         self.engine.dispose()

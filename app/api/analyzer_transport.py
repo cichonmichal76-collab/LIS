@@ -23,6 +23,7 @@ from app.schemas.analyzer_transport import (
     AnalyzerTransportQueueOutboundRequest,
     AnalyzerTransportReceiveControlRequest,
     AnalyzerTransportReceiveFrameRequest,
+    AnalyzerTransportRuntimeOverview,
     AnalyzerTransportSessionCreateRequest,
     AnalyzerTransportSessionSummary,
 )
@@ -84,6 +85,23 @@ def list_sessions(
     ),
 ) -> AnalyzerTransportListSessionsResponse:
     return transport_service.list_sessions(session, device_id=device_id)
+
+
+@router.get("/runtime/overview", response_model=AnalyzerTransportRuntimeOverview)
+def get_runtime_overview(
+    session: DbSession,
+    device_id: UUID | None = Query(default=None),
+    current_user: UserSummary = Depends(
+        require_roles(
+            RoleCode.ADMIN,
+            RoleCode.ACCESSIONER,
+            RoleCode.TECHNICIAN,
+            RoleCode.PATHOLOGIST,
+            RoleCode.VIEWER,
+        )
+    ),
+) -> AnalyzerTransportRuntimeOverview:
+    return transport_service.get_runtime_overview(session, device_id=device_id)
 
 
 @router.get("/sessions/{session_id}", response_model=AnalyzerTransportSessionSummary)

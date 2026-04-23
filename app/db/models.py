@@ -239,6 +239,12 @@ class AnalyzerTransportSessionRecord(Base):
     __table_args__ = (
         Index("ix_transport_session_runtime_device_created", "device_id", "created_at"),
         Index("ix_transport_session_runtime_status", "session_status", "last_activity_at"),
+        Index(
+            "ix_transport_session_runtime_lease_retry",
+            "lease_owner",
+            "lease_expires_at",
+            "next_retry_at",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -248,6 +254,12 @@ class AnalyzerTransportSessionRecord(Base):
     outbound_message_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     inbound_message_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     expected_inbound_frame_no: Mapped[int] = mapped_column(default=1)
+    lease_owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    lease_acquired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failure_count: Mapped[int] = mapped_column(default=0)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

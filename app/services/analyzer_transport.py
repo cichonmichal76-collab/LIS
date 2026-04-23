@@ -44,6 +44,7 @@ from app.schemas.analyzer_transport import (
     AnalyzerTransportQueueOutboundRequest,
     AnalyzerTransportReceiveControlRequest,
     AnalyzerTransportReceiveFrameRequest,
+    AnalyzerTransportRuntimeOverview,
     AnalyzerTransportSessionCreateRequest,
     AnalyzerTransportSessionStatus,
     AnalyzerTransportSessionSummary,
@@ -279,6 +280,57 @@ def list_sessions(
         stmt = stmt.where(AnalyzerTransportSessionRecord.device_id == str(device_id))
     return AnalyzerTransportListSessionsResponse(
         items=[_to_session_summary(row) for row in session.scalars(stmt).all()]
+    )
+
+
+def get_runtime_overview(
+    session: Session,
+    *,
+    device_id: UUID | None = None,
+) -> AnalyzerTransportRuntimeOverview:
+    profile_stmt: Select[tuple[AnalyzerTransportProfileRecord]] = select(
+        AnalyzerTransportProfileRecord
+    )
+    session_stmt: Select[tuple[AnalyzerTransportSessionRecord]] = select(
+        AnalyzerTransportSessionRecord
+    ).order_by(AnalyzerTransportSessionRecord.last_activity_at.desc())
+    if device_id is not None:
+        profile_stmt = profile_stmt.where(AnalyzerTransportProfileRecord.device_id == str(device_id))
+        session_stmt = session_stmt.where(AnalyzerTransportSessionRecord.device_id == str(device_id))
+
+    profiles = session.scalars(profile_stmt).all()
+    sessions = session.scalars(session_stmt).all()
+    now = datetime.now(UTC)
+
+    leased_session_count = sum(
+        1
+        for item in sessions
+        if item.lease_owner is not None
+        and _as_utc(item.lease_expires_at) is not None
+        and _as_utc(item.lease_expires_at) > now
+    )
+    stale_lease_count = sum(
+        1
+        for item in sessions
+        if item.lease_owner is not None
+        and _as_utc(item.lease_expires_at) is not None
+        and _as_utc(item.lease_expires_at) <= now
+    )
+    backoff_session_count = sum(
+        1
+        for item in sessions
+        if _as_utc(item.next_retry_at) is not None and _as_utc(item.next_retry_at) > now
+    )
+    error_session_count = sum(1 for item in sessions if item.session_status == "error")
+
+    return AnalyzerTransportRuntimeOverview(
+        profile_count=len(profiles),
+        session_count=len(sessions),
+        leased_session_count=leased_session_count,
+        stale_lease_count=stale_lease_count,
+        backoff_session_count=backoff_session_count,
+        error_session_count=error_session_count,
+        items=[_to_session_summary(item) for item in sessions],
     )
 
 
@@ -1365,6 +1417,14 @@ def _ack_deadline(profile: AnalyzerTransportProfileRecord) -> datetime:
     return datetime.now(UTC) + timedelta(seconds=profile.ack_timeout_seconds)
 
 
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def _touch_transport_session(
     transport_session: AnalyzerTransportSessionRecord,
     *,
@@ -1522,6 +1582,12 @@ def _to_session_summary(
         outbound_message_id=transport_session.outbound_message_id,
         inbound_message_id=transport_session.inbound_message_id,
         expected_inbound_frame_no=transport_session.expected_inbound_frame_no,
+        lease_owner=transport_session.lease_owner,
+        lease_acquired_at=transport_session.lease_acquired_at,
+        lease_expires_at=transport_session.lease_expires_at,
+        heartbeat_at=transport_session.heartbeat_at,
+        failure_count=transport_session.failure_count,
+        next_retry_at=transport_session.next_retry_at,
         last_error=transport_session.last_error,
         last_activity_at=transport_session.last_activity_at,
         created_at=transport_session.created_at,

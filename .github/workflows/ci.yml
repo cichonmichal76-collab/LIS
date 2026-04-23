@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  sqlite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+
+      - name: Lint
+        run: ruff check app tests scripts
+
+      - name: Compile
+        run: python -m compileall app scripts tests
+
+      - name: Verify runtime bootstrap SQL snapshot
+        run: python scripts/export_runtime_bootstrap.py --check
+
+      - name: Validate checked-in SQL artifacts
+        run: python scripts/validate_sql_artifacts.py
+
+      - name: Pytest
+        run: pytest -q
+
+      - name: Smoke matrix
+        run: python scripts/smoke_test_matrix.py
+
+      - name: Export OpenAPI
+        run: python scripts/export_openapi.py
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: lis_ci
+          POSTGRES_USER: lis
+          POSTGRES_PASSWORD: lis
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lis -d lis_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      LIS_DATABASE_URL: postgresql+psycopg://lis:lis@127.0.0.1:5432/lis_ci
+      LIS_TEST_DATABASE_URL: postgresql+psycopg://lis:lis@127.0.0.1:5432/postgres
+      LIS_SMOKE_DATABASE_URL: postgresql+psycopg://lis:lis@127.0.0.1:5432/postgres
+      LIS_AUTO_CREATE_SCHEMA: "false"
+      LIS_SCHEMA_BOOTSTRAP_MODE: runtime-sql
+      LIS_JWT_SECRET: ci-secret
+      LIS_ACCESS_TOKEN_EXPIRE_MINUTES: "480"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+
+      - name: Wait for PostgreSQL
+        run: python scripts/wait_for_db.py --database-url "$LIS_TEST_DATABASE_URL"
+
+      - name: Verify runtime bootstrap SQL snapshot
+        run: python scripts/export_runtime_bootstrap.py --check
+
+      - name: Validate checked-in SQL artifacts
+        run: python scripts/validate_sql_artifacts.py
+
+      - name: Bootstrap runtime schema
+        run: python scripts/migrate.py --database-url "$LIS_DATABASE_URL" --mode runtime-sql
+
+      - name: Pytest
+        run: pytest -q
+
+      - name: Smoke matrix
+        run: python scripts/smoke_test_matrix.py

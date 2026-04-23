@@ -8,7 +8,7 @@ The PostgreSQL E2E path verifies that:
 
 - the app starts from a dynamic `LIS_DATABASE_URL`
 - `/health` performs a real database ping
-- the runtime schema can be bootstrapped inside the container
+- the runtime schema can be bootstrapped from checked-in runtime SQL
 - `pytest` passes on PostgreSQL
 - smoke tests pass on PostgreSQL
 
@@ -45,8 +45,11 @@ docker compose run --rm test-runner
 The `test-runner` service executes:
 
 1. `python scripts/wait_for_db.py --database-url .../postgres`
-2. `pytest -q`
-3. `python scripts/smoke_test_matrix.py`
+2. `python scripts/export_runtime_bootstrap.py --check`
+3. `python scripts/migrate.py --database-url .../${POSTGRES_DB} --mode runtime-sql`
+4. `python scripts/validate_sql_artifacts.py`
+5. `pytest -q`
+6. `python scripts/smoke_test_matrix.py`
 
 ## Start only the API on PostgreSQL
 
@@ -77,24 +80,23 @@ The `analyzer-runtime` service executes:
 
 ## Current repository result
 
-The PostgreSQL E2E path is part of the supported project workflow and was previously validated
-on a live PostgreSQL container through:
+The PostgreSQL E2E path is part of the supported project workflow and is now also reflected in:
 
-```powershell
-docker compose run --rm test-runner
-```
+- [docker-compose.yml](C:/Users/cicho/OneDrive/Pulpit/LIS/docker-compose.yml)
+- [.github/workflows/ci.yml](C:/Users/cicho/OneDrive/Pulpit/LIS/.github/workflows/ci.yml)
+- [docs/runtime-bootstrap.md](C:/Users/cicho/OneDrive/Pulpit/LIS/docs/runtime-bootstrap.md)
 
-Previously confirmed baseline result:
+Previously confirmed baseline result on a live PostgreSQL container:
 
+- `docker compose run --rm test-runner`
 - `pytest -q` -> `14 passed`
 - `smoke_test_matrix.py` -> OK
 
-For the v11 QC and advanced autoverification step on 2026-04-23, a re-run was attempted in this environment, but it could
-not start because the Docker daemon was unavailable.
+For the v13 PostgreSQL-first step on 2026-04-23, a local Docker rerun was still not possible in this
+environment because the Docker daemon was unavailable.
 
 ## Known boundary
 
-- the runtime app still bootstraps its current operational schema through SQLAlchemy metadata
-- checked-in SQL migrations remain important project artifacts, but they are not yet the sole runtime migration mechanism
-- the current local smoke matrix now covers QC as well, but that updated matrix was not re-run here on live PostgreSQL because Docker was unavailable
+- the runtime schema is now bootstrapped from checked-in runtime SQL snapshots, but it is still a snapshot-based path rather than a full revisioned runtime migration framework
+- the current local smoke matrix and pytest path were re-run on SQLite in this environment, but not re-run here on a live PostgreSQL daemon on 2026-04-23
 - real analyzer runtime validation still depends on environment-specific TCP/serial access

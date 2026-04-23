@@ -17,6 +17,25 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-iterations", type=int, default=None, help="Optional loop limit.")
     parser.add_argument("--device-id", type=str, default=None, help="Restrict runtime to one device.")
     parser.add_argument("--profile-id", type=str, default=None, help="Restrict runtime to one transport profile.")
+    parser.add_argument("--worker-id", type=str, default=None, help="Override the runtime worker identifier.")
+    parser.add_argument(
+        "--lease-timeout-seconds",
+        type=int,
+        default=15,
+        help="Lease heartbeat timeout for owned transport sessions.",
+    )
+    parser.add_argument(
+        "--retry-backoff-seconds",
+        type=int,
+        default=5,
+        help="Base backoff delay applied after runtime transport errors.",
+    )
+    parser.add_argument(
+        "--retry-backoff-max-seconds",
+        type=int,
+        default=60,
+        help="Maximum backoff delay applied after runtime transport errors.",
+    )
     return parser
 
 
@@ -26,7 +45,13 @@ def main() -> None:
 
     settings = Settings.from_env()
     db = DatabaseSessionManager(settings.database_url)
-    worker = AnalyzerRuntimeWorker(db.session_factory)
+    worker = AnalyzerRuntimeWorker(
+        db.session_factory,
+        worker_id=args.worker_id,
+        lease_timeout_seconds=args.lease_timeout_seconds,
+        retry_backoff_seconds=args.retry_backoff_seconds,
+        retry_backoff_max_seconds=args.retry_backoff_max_seconds,
+    )
     try:
         if args.once:
             stats = worker.run_once(

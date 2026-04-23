@@ -33,7 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = effective_settings
         app.state.db = db
         if effective_settings.auto_create_schema:
-            db.create_schema()
+            db.create_schema(mode=effective_settings.schema_bootstrap_mode)
         try:
             yield
         finally:

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import os
 import socket
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 from uuid import UUID
 
 from sqlalchemy import Select, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -43,6 +45,9 @@ class AnalyzerConnector(Protocol):
 class AnalyzerRuntimeStats:
     profiles_seen: int = 0
     sessions_touched: int = 0
+    leases_acquired: int = 0
+    lease_skipped: int = 0
+    backoff_skipped: int = 0
     outbound_sent: int = 0
     inbound_processed: int = 0
     replies_sent: int = 0
@@ -182,9 +187,21 @@ class SerialAnalyzerConnector:
 
 
 class AnalyzerRuntimeWorker:
-    def __init__(self, session_factory):
+    def __init__(
+        self,
+        session_factory,
+        *,
+        worker_id: str | None = None,
+        lease_timeout_seconds: int = 15,
+        retry_backoff_seconds: int = 5,
+        retry_backoff_max_seconds: int = 60,
+    ):
         self._session_factory = session_factory
         self._connectors: dict[str, AnalyzerConnector] = {}
+        self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}"
+        self.lease_timeout_seconds = lease_timeout_seconds
+        self.retry_backoff_seconds = retry_backoff_seconds
+        self.retry_backoff_max_seconds = retry_backoff_max_seconds
 
     def register_connector(self, profile_id: UUID | str, connector: AnalyzerConnector) -> None:
         self._connectors[str(profile_id)] = connector
@@ -217,32 +234,43 @@ class AnalyzerRuntimeWorker:
                     )
                     if transport_session is None:
                         continue
+                    claimed_session, skip_reason = self._claim_session_lease(session, transport_session)
+                    if claimed_session is None:
+                        if skip_reason == "backoff":
+                            stats.backoff_skipped += 1
+                        else:
+                            stats.lease_skipped += 1
+                        continue
                     stats.sessions_touched += 1
+                    stats.leases_acquired += 1
                     connector = self._ensure_connector(profile)
                     if not connector.is_open():
                         connector.open()
+                    self._heartbeat_session(session, claimed_session)
                     self._drain_available_inbound(
                         session,
                         profile=profile,
-                        transport_session=transport_session,
+                        transport_session=claimed_session,
                         connector=connector,
                         stats=stats,
                     )
                     self._handle_ack_timeout(
                         session,
                         profile=profile,
-                        transport_session=transport_session,
+                        transport_session=claimed_session,
                         stats=stats,
                     )
                     self._send_next_outbound(
                         session,
                         profile=profile,
-                        transport_session=transport_session,
+                        transport_session=claimed_session,
                         connector=connector,
                         stats=stats,
                     )
+                    self._mark_cycle_success(session, claimed_session)
             except Exception as exc:
                 stats.errors.append(f"{current_profile_id}: {exc}")
+                self._reset_connector(current_profile_id)
                 self._record_runtime_error(current_profile_id, str(exc))
         return stats
 
@@ -261,6 +289,7 @@ class AnalyzerRuntimeWorker:
             time.sleep(sleep_seconds)
 
     def close(self) -> None:
+        self._release_owned_leases()
         for connector in self._connectors.values():
             connector.close()
         self._connectors.clear()
@@ -310,6 +339,103 @@ class AnalyzerRuntimeWorker:
             actor=None,
         )
         return session.get(AnalyzerTransportSessionRecord, str(created.id))
+
+    def _claim_session_lease(
+        self,
+        session: Session,
+        transport_session: AnalyzerTransportSessionRecord,
+    ) -> tuple[AnalyzerTransportSessionRecord | None, str | None]:
+        current = session.get(AnalyzerTransportSessionRecord, transport_session.id)
+        if current is None:
+            return None, None
+
+        now = datetime.now(UTC)
+        next_retry_at = _as_utc(current.next_retry_at)
+        if next_retry_at is not None and next_retry_at > now:
+            return None, "backoff"
+
+        lease_expires_at = _as_utc(current.lease_expires_at)
+        lease_active = (
+            current.lease_owner is not None
+            and lease_expires_at is not None
+            and lease_expires_at > now
+        )
+        if lease_active and current.lease_owner != self.worker_id:
+            return None, "lease"
+
+        taking_new_lease = current.lease_owner != self.worker_id or current.lease_acquired_at is None
+        current.lease_owner = self.worker_id
+        if taking_new_lease:
+            current.lease_acquired_at = now
+        current.heartbeat_at = now
+        current.lease_expires_at = now + timedelta(seconds=self.lease_timeout_seconds)
+        current.last_activity_at = now
+        session.commit()
+        session.refresh(current)
+        return current, None
+
+    def _heartbeat_session(
+        self,
+        session: Session,
+        transport_session: AnalyzerTransportSessionRecord,
+    ) -> None:
+        current = session.get(AnalyzerTransportSessionRecord, transport_session.id)
+        if current is None or current.lease_owner != self.worker_id:
+            return
+        now = datetime.now(UTC)
+        current.heartbeat_at = now
+        current.lease_expires_at = now + timedelta(seconds=self.lease_timeout_seconds)
+        current.last_activity_at = now
+        session.flush()
+
+    def _mark_cycle_success(
+        self,
+        session: Session,
+        transport_session: AnalyzerTransportSessionRecord,
+    ) -> None:
+        current = session.get(AnalyzerTransportSessionRecord, transport_session.id)
+        if current is None or current.lease_owner != self.worker_id:
+            return
+        now = datetime.now(UTC)
+        current.last_error = None
+        current.failure_count = 0
+        current.next_retry_at = None
+        if current.session_status == "error":
+            current.session_status = "idle"
+        current.heartbeat_at = now
+        current.lease_expires_at = now + timedelta(seconds=self.lease_timeout_seconds)
+        current.last_activity_at = now
+        session.commit()
+
+    def _release_owned_leases(self) -> None:
+        with self._session_factory() as session:
+            try:
+                owned_sessions = session.scalars(
+                    select(AnalyzerTransportSessionRecord).where(
+                        AnalyzerTransportSessionRecord.lease_owner == self.worker_id
+                    )
+                ).all()
+            except OperationalError:
+                # Older local SQLite files may predate the v12 lease columns.
+                # In that case we skip lease release and rely on reset/migrate flow.
+                session.rollback()
+                return
+            if not owned_sessions:
+                return
+            now = datetime.now(UTC)
+            for current in owned_sessions:
+                current.lease_owner = None
+                current.lease_acquired_at = None
+                current.lease_expires_at = None
+                current.heartbeat_at = now
+                current.last_activity_at = now
+            session.commit()
+
+    def _reset_connector(self, profile_id: str) -> None:
+        connector = self._connectors.get(profile_id)
+        if connector is None:
+            return
+        connector.close()
 
     def _ensure_connector(self, profile: AnalyzerTransportProfileRecord) -> AnalyzerConnector:
         existing = self._connectors.get(profile.id)
@@ -376,7 +502,8 @@ class AnalyzerRuntimeWorker:
         message = session.get(AnalyzerTransportMessageRecord, current_session.outbound_message_id)
         if message is None or message.transport_status != "awaiting_ack":
             return
-        if message.ack_deadline_at is None or message.ack_deadline_at > datetime.now(UTC):
+        ack_deadline_at = _as_utc(message.ack_deadline_at)
+        if ack_deadline_at is None or ack_deadline_at > datetime.now(UTC):
             return
         transport_service.timeout_outbound(
             session,
@@ -480,9 +607,21 @@ class AnalyzerRuntimeWorker:
             )
             if current_session is None:
                 return
+            now = datetime.now(UTC)
+            failure_count = (current_session.failure_count or 0) + 1
+            retry_delay = min(
+                self.retry_backoff_seconds * (2 ** (failure_count - 1)),
+                self.retry_backoff_max_seconds,
+            )
             current_session.session_status = "error"
             current_session.last_error = error_text
-            current_session.last_activity_at = datetime.now(UTC)
+            current_session.failure_count = failure_count
+            current_session.next_retry_at = now + timedelta(seconds=retry_delay)
+            current_session.lease_owner = self.worker_id
+            current_session.lease_acquired_at = current_session.lease_acquired_at or now
+            current_session.lease_expires_at = now + timedelta(seconds=self.lease_timeout_seconds)
+            current_session.heartbeat_at = now
+            current_session.last_activity_at = now
             session.commit()
 
 
@@ -519,3 +658,11 @@ def _extract_transport_item(buffer: bytearray) -> str | None:
     payload = bytes(buffer[: frame_end + len(terminator)])
     del buffer[: frame_end + len(terminator)]
     return payload.decode("ascii", errors="ignore")
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

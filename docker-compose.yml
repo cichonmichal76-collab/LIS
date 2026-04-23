@@ -22,6 +22,7 @@ services:
     environment:
       LIS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/${POSTGRES_DB:-lis}
       LIS_AUTO_CREATE_SCHEMA: "false"
+      LIS_SCHEMA_BOOTSTRAP_MODE: runtime-sql
       LIS_JWT_SECRET: ${LIS_JWT_SECRET:-change-me-in-prod}
       LIS_ACCESS_TOKEN_EXPIRE_MINUTES: ${LIS_ACCESS_TOKEN_EXPIRE_MINUTES:-480}
     depends_on:
@@ -40,6 +41,7 @@ services:
     environment:
       LIS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/${POSTGRES_DB:-lis}
       LIS_AUTO_CREATE_SCHEMA: "false"
+      LIS_SCHEMA_BOOTSTRAP_MODE: runtime-sql
       LIS_JWT_SECRET: ${LIS_JWT_SECRET:-change-me-in-prod}
       LIS_ACCESS_TOKEN_EXPIRE_MINUTES: ${LIS_ACCESS_TOKEN_EXPIRE_MINUTES:-480}
       LIS_ANALYZER_RUNTIME_SLEEP_SECONDS: ${LIS_ANALYZER_RUNTIME_SLEEP_SECONDS:-1}
@@ -59,6 +61,7 @@ services:
       LIS_TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/postgres
       LIS_SMOKE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/postgres
       LIS_AUTO_CREATE_SCHEMA: "false"
+      LIS_SCHEMA_BOOTSTRAP_MODE: runtime-sql
       LIS_JWT_SECRET: ${LIS_JWT_SECRET:-change-me-in-prod}
       LIS_ACCESS_TOKEN_EXPIRE_MINUTES: ${LIS_ACCESS_TOKEN_EXPIRE_MINUTES:-480}
     depends_on:
@@ -66,6 +69,9 @@ services:
         condition: service_healthy
     command: >
       sh -c "python scripts/wait_for_db.py --database-url postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/postgres &&
+             python scripts/export_runtime_bootstrap.py --check &&
+             python scripts/migrate.py --database-url postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/${POSTGRES_DB:-lis} --mode runtime-sql &&
+             python scripts/validate_sql_artifacts.py &&
              pytest -q &&
              python scripts/smoke_test_matrix.py"
 

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 APP_NAME = "LIS Core API"
-APP_VERSION = "0.11.0"
+APP_VERSION = "0.13.0"
 
 
 def _default_database_url() -> str:
@@ -17,6 +17,7 @@ def _default_database_url() -> str:
 class Settings:
     database_url: str
     auto_create_schema: bool = True
+    schema_bootstrap_mode: str = "runtime-sql"
     jwt_secret: str = "dev-secret-change-me-please-replace-32b"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
@@ -27,6 +28,7 @@ class Settings:
             database_url=os.getenv("LIS_DATABASE_URL", _default_database_url()),
             auto_create_schema=os.getenv("LIS_AUTO_CREATE_SCHEMA", "true").lower()
             in {"1", "true", "yes", "on"},
+            schema_bootstrap_mode=os.getenv("LIS_SCHEMA_BOOTSTRAP_MODE", "runtime-sql"),
             jwt_secret=os.getenv("LIS_JWT_SECRET", "dev-secret-change-me-please-replace-32b"),
             jwt_algorithm=os.getenv("LIS_JWT_ALGORITHM", "HS256"),
             access_token_expire_minutes=int(os.getenv("LIS_ACCESS_TOKEN_EXPIRE_MINUTES", "480")),
