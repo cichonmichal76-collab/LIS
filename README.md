@@ -15,22 +15,27 @@ Starter repo for a greenfield LIS v1 built as a modular monolith with:
   Canonical target PostgreSQL schema imported from the starter pack and kept as the design target.
 - `db/migrations/postgres/*.sql` and `db/migrations/sqlite/*.sql`
   Checked-in SQL bootstrap files for the canonical design on PostgreSQL and SQLite,
-  including v6 additions for device mappings, interface logs, autoverification, and ASTM-style support.
+  including v10 additions for device mappings, interface logs, autoverification,
+  QC engine, ASTM-style support, analyzer transport, and analyzer runtime.
 - `openapi/lis-internal-v1.yaml`
   Generated internal API contract for the current implemented slices:
   `auth`, `patients`, `test-catalog`, `orders`, `specimens`, `tasks`,
-  `observations`, `reports`, `audit`, `provenance`, `devices`, and `integrations`.
+  `observations`, `reports`, `audit`, `provenance`, `devices`, `qc`,
+  `integrations`, and `analyzer-transport`.
 - `openapi/lis-target-v1.yaml`
   Target API contract for the broader LIS MVP, including `observations`, `reports`, `audit`, and device ingest.
 - `app/`
   FastAPI service with working persistence, JWT auth, RBAC, HL7 v2 starter adapter,
-  device gateway, autoverification, ASTM-style drivers, and a read/search FHIR R4 facade.
+  device gateway, autoverification, QC engine, ASTM-style drivers, analyzer transport
+  sessions, a background analyzer runtime, and a read/search FHIR R4 facade.
 - `scripts/`
   Runtime helpers for schema bootstrap, OpenAPI export, demo seed data, REST smoke flow,
   FHIR smoke flow, integration smoke flow, autoverification smoke flow, ASTM smoke flow,
-  database wait/reset helpers, and a smoke matrix runner.
+  analyzer transport smoke flow, analyzer runtime smoke flow, database wait/reset helpers,
+  and a smoke matrix runner.
 - `Dockerfile` and `docker-compose.yml`
-  Container path for the API plus PostgreSQL, including a `test-runner` service for end-to-end validation.
+  Container path for the API, analyzer runtime, and PostgreSQL, including a `test-runner`
+  service for end-to-end validation.
 - `.env.example` and `Makefile`
   Ready-to-use local env template and common developer commands for migrate/test/smoke/docker flows.
 - `docs/`
@@ -58,6 +63,10 @@ python scripts/smoke_test_fhir.py
 python scripts/smoke_test_integration.py
 python scripts/smoke_test_autoverification.py
 python scripts/smoke_test_astm.py
+python scripts/smoke_test_qc.py
+python scripts/smoke_test_transport.py
+python scripts/analyzer_runtime.py --once
+python scripts/smoke_test_runtime.py
 python scripts/smoke_test_matrix.py
 ```
 
@@ -85,6 +94,8 @@ Optional runtime config:
   Defaults to `HS256`.
 - `LIS_ACCESS_TOKEN_EXPIRE_MINUTES`
   Defaults to `480`.
+- `LIS_ANALYZER_RUNTIME_SLEEP_SECONDS`
+  Default pause between analyzer runtime worker cycles in Docker Compose.
 
 ## Current status
 
@@ -95,15 +106,22 @@ This repo now includes a working persistence slice for:
 - `orders`, `specimens`, `tasks`, `observations`, and `reports`,
 - `devices`, `device mappings`, `interface messages`, and `raw instrument messages`,
 - rule-based autoverification with evaluate/apply and append-only run history,
+- richer autoverification conditions for reference intervals, interpretation codes, and delta recency,
+- QC materials, lots, rules, runs, results, and QC gate enforcement for observation/report release,
 - placeholder report PDF rendering under `/api/v1/reports/{report_id}/pdf`,
 - append-only `audit` and `provenance`,
 - HL7 v2 starter interoperability for inbound/outbound `OML^O33` and `ORU^R01`,
 - device gateway worklists and analyzer result ingest with traceability to `raw_message_id`,
 - ASTM-style worklist export and result import with optional autoverification chaining,
+- analyzer transport profiles, sessions, outbound queue, ASTM framing,
+  `ENQ`/`ACK`/`NAK`/`EOT`, retry handling, frame logs, and dispatch into ASTM import,
+- analyzer runtime worker with `mock`, `tcp-client`, and `serial` connector modes,
+  plus a dedicated Docker Compose service for background transport processing,
 - FHIR R4 `read` and `search-type` for `Patient`, `ServiceRequest`, `Specimen`,
   `Task`, `Observation`, `DiagnosticReport`, `AuditEvent`, and `Provenance`,
 - dynamic `DATABASE_URL` runtime selection with real database ping in `/health`,
-- SQLite local validation plus PostgreSQL end-to-end validation through `docker compose run --rm test-runner`.
+- SQLite local validation, plus a documented PostgreSQL end-to-end path through
+  `docker compose run --rm test-runner` when Docker is available.
 
 That gives a clean baseline for building the next slices without redesigning the core model.
 
@@ -131,19 +149,23 @@ The current implementation is intentionally narrower than the target design. It 
 - autoverification rules, evaluation, apply flow, and manual-review task creation,
 - HL7 v2 order/result import-export for `OML^O33` and `ORU^R01`,
 - ASTM-style worklist export and result ingest,
+- analyzer transport sessions and ASTM-style framed message handling,
+- background analyzer runtime with connector abstraction and smoke coverage,
 - FHIR `CapabilityStatement` plus read/search facade under `/fhir/R4`.
 
 The target design extends that baseline to:
 
 - deeper PostgreSQL-first alignment with canonical target tables,
 - vendor-specific device drivers and richer interface protocols,
+- richer connection recovery, leader/lease coordination, and production hardening for the analyzer runtime,
+- deeper QC coverage such as richer Westgard/trend rules and operational QC scheduling,
 - richer FHIR interoperability such as write interactions, subscriptions, and profiles.
 
 ## Suggested next milestones
 
-1. Add QC engine, Westgard-style rules, and richer delta checks.
-2. Add richer user and practitioner linkage beyond starter RBAC.
-3. Extend interoperability toward vendor-specific drivers, ASTM/CLSI framing, and retry/ACK handling.
+1. Add multi-level QC, richer trend rules, and deeper clinical/autoverification context.
+2. Harden analyzer runtime with reconnection, monitoring, and multi-worker coordination.
+3. Add richer user and practitioner linkage beyond starter RBAC.
 4. Add richer FHIR features such as writes, subscriptions, and profile validation.
 
 ## Design Docs
@@ -155,7 +177,10 @@ The target design extends that baseline to:
 - [HL7 v2 Adapter](docs/hl7-v2-adapter.md)
 - [Device Gateway](docs/device-gateway.md)
 - [Autoverification Engine](docs/autoverification-engine.md)
+- [QC Engine](docs/qc-engine.md)
 - [ASTM Driver Layer](docs/astm-driver-layer.md)
+- [Analyzer Transport](docs/analyzer-transport.md)
+- [Analyzer Runtime](docs/analyzer-runtime.md)
 - [PostgreSQL E2E](docs/postgres-e2e.md)
 - [Validation](docs/validation.md)
 - [FHIR Mapping](docs/fhir-mapping.md)

@@ -20,8 +20,14 @@ Tu znajduje sie dokumentacja projektowa i operacyjna repo.
   Device gateway i analiza komunikatow urzadzen.
 - `autoverification-engine.md`
   Silnik autoweryfikacji.
+- `qc-engine.md`
+  Silnik kontroli jakosci i gate dla wynikow oraz raportow.
 - `astm-driver-layer.md`
   Warstwa ASTM-style.
+- `analyzer-transport.md`
+  Warstwa transportowa analizatorow: sesje, ramki, ACK/NAK i retry.
+- `analyzer-runtime.md`
+  Background worker analizatorow i konektory mock/TCP/serial.
 - `postgres-e2e.md`
   Jak uruchomic i sprawdzic pelny przebieg PostgreSQL E2E.
 - `validation.md`

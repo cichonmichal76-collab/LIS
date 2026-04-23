@@ -1,6 +1,6 @@
 PYTHON ?= python
 
-.PHONY: migrate reset-db wait-db test smoke smoke-matrix export-openapi docker-up docker-test-postgres
+.PHONY: migrate reset-db wait-db test smoke smoke-matrix export-openapi runtime docker-up docker-test-postgres
 
 migrate:
 	$(PYTHON) scripts/migrate.py
@@ -22,6 +22,9 @@ smoke-matrix:
 
 export-openapi:
 	$(PYTHON) scripts/export_openapi.py
+
+runtime:
+	$(PYTHON) scripts/analyzer_runtime.py
 
 docker-up:
 	docker compose up --build api

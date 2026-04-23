@@ -11,6 +11,9 @@ SCRIPTS = [
     "scripts/smoke_test_integration.py",
     "scripts/smoke_test_autoverification.py",
     "scripts/smoke_test_astm.py",
+    "scripts/smoke_test_qc.py",
+    "scripts/smoke_test_transport.py",
+    "scripts/smoke_test_runtime.py",
 ]
 
 

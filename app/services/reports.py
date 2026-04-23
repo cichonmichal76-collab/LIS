@@ -24,6 +24,7 @@ from app.schemas.reports import (
 )
 from app.services.audit import write_audit_event
 from app.services.provenance import write_provenance_record
+from app.services import qc as qc_service
 
 
 def generate_report(
@@ -147,6 +148,12 @@ def authorize_report(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Report {report_id} cannot be authorized from status '{report.status}'.",
+        )
+    qc_blockers = _report_qc_blockers(session, report)
+    if qc_blockers:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="QC gate blocks report authorization: " + "; ".join(qc_blockers),
         )
 
     signed_at = datetime.now(UTC)
@@ -303,6 +310,20 @@ def _get_report_or_404(session: Session, report_id: UUID) -> DiagnosticReportRec
 
 def _generate_identifier(prefix: str) -> str:
     return f"{prefix}-{datetime.now(UTC):%Y%m%d%H%M%S}-{uuid4().hex[:8].upper()}"
+
+
+def _report_qc_blockers(session: Session, report: DiagnosticReportRecord) -> list[str]:
+    blockers: list[str] = []
+    for report_observation in report.report_observations:
+        gate = qc_service.get_observation_gate(session, UUID(report_observation.observation_id))
+        if gate.applies and not gate.allowed:
+            blockers.extend(
+                [
+                    f"observation {report_observation.observation_id}: {reason}"
+                    for reason in gate.reasons
+                ]
+            )
+    return blockers
 
 
 def _to_report_summary(report: DiagnosticReportRecord) -> DiagnosticReportSummary:

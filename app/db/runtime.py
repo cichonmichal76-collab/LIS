@@ -44,6 +44,8 @@ def ping_database(database_url: str) -> None:
 
 
 def ensure_runtime_schema(database_url: str) -> None:
+    from app.db import models as _models  # noqa: F401
+
     engine = create_runtime_engine(database_url)
     try:
         Base.metadata.create_all(engine)

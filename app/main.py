@@ -5,9 +5,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.auth import router as auth_router
+from app.api.analyzer_transport import router as analyzer_transport_router
 from app.api.autoverification import router as autoverification_router
 from app.api.fhir import router as fhir_router
 from app.api.health import router as health_router
+from app.api.qc import router as qc_router
 from app.api.catalog import router as catalog_router
 from app.api.devices import router as devices_router
 from app.api.integrations import router as integrations_router
@@ -45,7 +47,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "Internal API with working persistence for auth, master data, orders, "
             "specimen lifecycle, task orchestration, observations, reports, audit, "
             "provenance, device registry, HL7 v2 integrations, device gateway, "
-            "autoverification, ASTM-style drivers, and a read/search FHIR facade."
+            "autoverification, QC engine, ASTM-style drivers, analyzer transport "
+            "sessions, and a read/search FHIR facade."
         ),
         lifespan=lifespan,
     )
@@ -53,7 +56,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router)
     app.include_router(fhir_router)
     app.include_router(auth_router)
+    app.include_router(analyzer_transport_router)
     app.include_router(autoverification_router)
+    app.include_router(qc_router)
     app.include_router(patients_router)
     app.include_router(catalog_router)
     app.include_router(devices_router)

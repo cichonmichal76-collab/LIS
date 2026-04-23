@@ -34,6 +34,23 @@ services:
              python scripts/migrate.py &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
+  analyzer-runtime:
+    build:
+      context: .
+    environment:
+      LIS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lis}:${POSTGRES_PASSWORD:-lis}@db:5432/${POSTGRES_DB:-lis}
+      LIS_AUTO_CREATE_SCHEMA: "false"
+      LIS_JWT_SECRET: ${LIS_JWT_SECRET:-change-me-in-prod}
+      LIS_ACCESS_TOKEN_EXPIRE_MINUTES: ${LIS_ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+      LIS_ANALYZER_RUNTIME_SLEEP_SECONDS: ${LIS_ANALYZER_RUNTIME_SLEEP_SECONDS:-1}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python scripts/wait_for_db.py &&
+             python scripts/migrate.py &&
+             python scripts/analyzer_runtime.py --sleep-seconds ${LIS_ANALYZER_RUNTIME_SLEEP_SECONDS:-1}"
+
   test-runner:
     build:
       context: .

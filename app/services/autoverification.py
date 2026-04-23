@@ -33,6 +33,7 @@ from app.schemas.autoverification import (
 )
 from app.services.audit import write_audit_event
 from app.services.provenance import write_provenance_record
+from app.services import qc as qc_service
 
 ALLOWED_REVIEW_TASK_STATUSES = {"created", "ready", "in_progress", "on_hold"}
 
@@ -107,6 +108,9 @@ def evaluate_observation(
     evaluated_rules = [_evaluate_rule(rule, context, previous_final) for rule in rules]
 
     implicit_reasons: list[str] = []
+    qc_gate = qc_service.get_observation_gate(session, observation_id)
+    if qc_gate.applies and not qc_gate.allowed:
+        implicit_reasons.extend(qc_gate.reasons)
     if context["specimen_status"] in {"rejected", "disposed"}:
         implicit_reasons.append(
             f"specimen status {context['specimen_status']!r} blocks autoverification"
@@ -364,6 +368,7 @@ def _evaluate_rule(
     observation: ObservationRecord = context["observation"]
     condition = rule.condition_payload or {}
     reasons: list[str] = []
+    reference_snapshot = observation.reference_interval_snapshot or {}
 
     if condition.get("require_value", True):
         if observation.value_type == "quantity" and observation.value_num is None:
@@ -393,6 +398,31 @@ def _evaluate_rule(
     if disallowed_flags and (observation.abnormal_flag or "") in disallowed_flags:
         reasons.append(f"abnormal flag {(observation.abnormal_flag or '')!r} is disallowed")
 
+    if condition.get("require_reference_interval") and not _has_reference_interval(reference_snapshot):
+        reasons.append("reference interval snapshot is required but missing")
+
+    if condition.get("require_within_reference_interval"):
+        reference_reason = _check_reference_interval(observation, reference_snapshot)
+        if reference_reason is not None:
+            reasons.append(reference_reason)
+
+    if condition.get("disallow_reference_critical"):
+        critical_reason = _check_reference_critical(observation, reference_snapshot)
+        if critical_reason is not None:
+            reasons.append(critical_reason)
+
+    allowed_interpretation_codes = condition.get("allowed_interpretation_codes")
+    if allowed_interpretation_codes is not None and (observation.interpretation_code or "") not in allowed_interpretation_codes:
+        reasons.append(
+            f"interpretation code {(observation.interpretation_code or '')!r} not in allowed set"
+        )
+
+    disallow_interpretation_codes = condition.get("disallow_interpretation_codes")
+    if disallow_interpretation_codes and (observation.interpretation_code or "") in disallow_interpretation_codes:
+        reasons.append(
+            f"interpretation code {(observation.interpretation_code or '')!r} is disallowed"
+        )
+
     _check_numeric_limit(reasons, "minimum", observation.value_num, condition.get("numeric_min"), below=True)
     _check_numeric_limit(reasons, "maximum", observation.value_num, condition.get("numeric_max"), below=False)
     _check_critical_limit(reasons, observation.value_num, condition.get("critical_low"), is_low=True)
@@ -400,6 +430,15 @@ def _evaluate_rule(
 
     if condition.get("require_previous_final") and previous_final is None:
         reasons.append("previous final result required for delta check but not found")
+
+    delta_requested = any(
+        condition.get(key) is not None
+        for key in ("delta_abs_max", "delta_percent_max", "delta_previous_max_age_hours")
+    )
+    if previous_final is not None and delta_requested:
+        _check_delta_age(reasons, observation, previous_final, condition.get("delta_previous_max_age_hours"))
+        if condition.get("delta_require_same_unit", True):
+            _check_delta_unit_match(reasons, observation, previous_final)
 
     if previous_final is not None and observation.value_num is not None and previous_final.value_num is not None:
         delta = abs(float(observation.value_num) - float(previous_final.value_num))
@@ -461,6 +500,77 @@ def _check_critical_limit(
         reasons.append(f"value {value_num} reached critical low threshold {threshold}")
     if not is_low and float(value_num) >= threshold_value:
         reasons.append(f"value {value_num} reached critical high threshold {threshold}")
+
+
+def _has_reference_interval(snapshot: dict[str, Any]) -> bool:
+    return any(snapshot.get(key) is not None for key in ("low", "high", "critical_low", "critical_high", "text_range"))
+
+
+def _check_reference_interval(
+    observation: ObservationRecord,
+    snapshot: dict[str, Any],
+) -> str | None:
+    if observation.value_type != "quantity" or observation.value_num is None:
+        return "reference interval check requires a numeric result"
+    low = snapshot.get("low")
+    high = snapshot.get("high")
+    if low is None and high is None:
+        return "reference interval bounds are unavailable"
+    if low is not None and float(observation.value_num) < float(low):
+        return f"value {observation.value_num} is below reference low {low}"
+    if high is not None and float(observation.value_num) > float(high):
+        return f"value {observation.value_num} is above reference high {high}"
+    return None
+
+
+def _check_reference_critical(
+    observation: ObservationRecord,
+    snapshot: dict[str, Any],
+) -> str | None:
+    if observation.value_type != "quantity" or observation.value_num is None:
+        return None
+    critical_low = snapshot.get("critical_low")
+    critical_high = snapshot.get("critical_high")
+    if critical_low is not None and float(observation.value_num) <= float(critical_low):
+        return f"value {observation.value_num} reached reference critical low {critical_low}"
+    if critical_high is not None and float(observation.value_num) >= float(critical_high):
+        return f"value {observation.value_num} reached reference critical high {critical_high}"
+    return None
+
+
+def _check_delta_age(
+    reasons: list[str],
+    observation: ObservationRecord,
+    previous_final: ObservationRecord,
+    max_age_hours: Any,
+) -> None:
+    if max_age_hours is None:
+        return
+    current_at = _observation_timestamp(observation)
+    previous_at = _observation_timestamp(previous_final)
+    if current_at is None or previous_at is None:
+        reasons.append("delta check cannot determine observation timestamps")
+        return
+    age_hours = abs((current_at - previous_at).total_seconds()) / 3600.0
+    if age_hours > float(max_age_hours):
+        reasons.append(
+            f"previous final result is {age_hours:.1f}h old which exceeds delta max age {max_age_hours}h"
+        )
+
+
+def _check_delta_unit_match(
+    reasons: list[str],
+    observation: ObservationRecord,
+    previous_final: ObservationRecord,
+) -> None:
+    previous_unit = previous_final.unit_ucum or ""
+    current_unit = observation.unit_ucum or ""
+    if previous_unit and current_unit and previous_unit != current_unit:
+        reasons.append(f"delta unit mismatch: previous {previous_unit!r} vs current {current_unit!r}")
+
+
+def _observation_timestamp(observation: ObservationRecord) -> datetime | None:
+    return observation.issued_at or observation.effective_at or observation.created_at
 
 
 def _ensure_review_task(

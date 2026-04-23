@@ -102,6 +102,224 @@ class DeviceTestMapRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class QcMaterialRecord(Base):
+    __tablename__ = "qc_material_runtime"
+    __table_args__ = (
+        Index("ix_qc_material_runtime_code", "code"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
+    manufacturer: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class QcLotRecord(Base):
+    __tablename__ = "qc_lot_runtime"
+    __table_args__ = (
+        Index("ix_qc_lot_runtime_test_device", "test_catalog_id", "device_id", "active"),
+        Index("ix_qc_lot_runtime_material_lot", "material_id", "lot_no"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    material_id: Mapped[str] = mapped_column(ForeignKey("qc_material_runtime.id"))
+    lot_no: Mapped[str] = mapped_column(String(64))
+    test_catalog_id: Mapped[str] = mapped_column(ForeignKey("test_catalog_runtime.id"))
+    device_id: Mapped[str | None] = mapped_column(ForeignKey("device_runtime.id"), nullable=True)
+    unit_ucum: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    target_mean: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_sd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    min_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class QcRuleRecord(Base):
+    __tablename__ = "qc_rule_runtime"
+    __table_args__ = (
+        Index("ix_qc_rule_runtime_scope", "test_catalog_id", "device_id", "active"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    priority: Mapped[int] = mapped_column(default=100)
+    test_catalog_id: Mapped[str | None] = mapped_column(
+        ForeignKey("test_catalog_runtime.id"),
+        nullable=True,
+    )
+    device_id: Mapped[str | None] = mapped_column(ForeignKey("device_runtime.id"), nullable=True)
+    rule_type: Mapped[str] = mapped_column(String(32))
+    params_payload: Mapped[dict[str, Any]] = mapped_column("params_json", JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class QcRunRecord(Base):
+    __tablename__ = "qc_run_runtime"
+    __table_args__ = (
+        Index("ix_qc_run_runtime_lot_status", "lot_id", "status", "created_at"),
+        Index("ix_qc_run_runtime_device_status", "device_id", "status", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    lot_id: Mapped[str] = mapped_column(ForeignKey("qc_lot_runtime.id"))
+    device_id: Mapped[str | None] = mapped_column(ForeignKey("device_runtime.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="open")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("app_user_runtime.id"), nullable=True)
+    summary_payload: Mapped[dict[str, Any]] = mapped_column("summary_json", JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class QcResultRecord(Base):
+    __tablename__ = "qc_result_runtime"
+    __table_args__ = (
+        Index("ix_qc_result_runtime_run_created", "run_id", "created_at"),
+        Index("ix_qc_result_runtime_test_eval", "test_catalog_id", "evaluated_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("qc_run_runtime.id"))
+    test_catalog_id: Mapped[str] = mapped_column(ForeignKey("test_catalog_runtime.id"))
+    value_num: Mapped[float] = mapped_column(Float)
+    unit_ucum: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    decision: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    z_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    warning_rules_payload: Mapped[list[str]] = mapped_column("warning_rules_json", JSON, default=list)
+    failure_rules_payload: Mapped[list[str]] = mapped_column("failure_rules_json", JSON, default=list)
+    observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    raw_message_id: Mapped[str | None] = mapped_column(
+        ForeignKey("raw_instrument_message_runtime.id"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class AnalyzerTransportProfileRecord(Base):
+    __tablename__ = "analyzer_transport_profile_runtime"
+    __table_args__ = (
+        Index("ix_transport_profile_runtime_device_active", "device_id", "active"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    device_id: Mapped[str] = mapped_column(ForeignKey("device_runtime.id"))
+    protocol: Mapped[str] = mapped_column(String(32))
+    framing_mode: Mapped[str] = mapped_column(String(32))
+    connection_mode: Mapped[str] = mapped_column(String(32), default="mock")
+    tcp_host: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tcp_port: Mapped[int | None] = mapped_column(nullable=True)
+    serial_port: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    serial_baudrate: Mapped[int | None] = mapped_column(nullable=True)
+    frame_payload_size: Mapped[int] = mapped_column(default=240)
+    ack_timeout_seconds: Mapped[int] = mapped_column(default=30)
+    max_retries: Mapped[int] = mapped_column(default=3)
+    poll_interval_seconds: Mapped[int] = mapped_column(default=1)
+    read_timeout_seconds: Mapped[int] = mapped_column(default=1)
+    write_timeout_seconds: Mapped[int] = mapped_column(default=5)
+    auto_dispatch_astm: Mapped[bool] = mapped_column(Boolean, default=True)
+    auto_verify: Mapped[bool] = mapped_column(Boolean, default=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class AnalyzerTransportSessionRecord(Base):
+    __tablename__ = "analyzer_transport_session_runtime"
+    __table_args__ = (
+        Index("ix_transport_session_runtime_device_created", "device_id", "created_at"),
+        Index("ix_transport_session_runtime_status", "session_status", "last_activity_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    device_id: Mapped[str] = mapped_column(ForeignKey("device_runtime.id"))
+    profile_id: Mapped[str] = mapped_column(ForeignKey("analyzer_transport_profile_runtime.id"))
+    session_status: Mapped[str] = mapped_column(String(32))
+    outbound_message_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    inbound_message_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    expected_inbound_frame_no: Mapped[int] = mapped_column(default=1)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AnalyzerTransportMessageRecord(Base):
+    __tablename__ = "analyzer_transport_message_runtime"
+    __table_args__ = (
+        Index(
+            "ix_transport_message_runtime_session_status",
+            "session_id",
+            "direction",
+            "transport_status",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("analyzer_transport_session_runtime.id"))
+    device_id: Mapped[str] = mapped_column(ForeignKey("device_runtime.id"))
+    direction: Mapped[str] = mapped_column(String(16))
+    protocol: Mapped[str] = mapped_column(String(32))
+    message_type: Mapped[str] = mapped_column(String(64))
+    transport_status: Mapped[str] = mapped_column(String(32))
+    logical_payload: Mapped[str] = mapped_column(Text, default="")
+    assembled_payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+    frames_payload: Mapped[list[dict[str, Any]]] = mapped_column("frames_json", JSON, default=list)
+    total_frames: Mapped[int] = mapped_column(default=0)
+    next_frame_index: Mapped[int] = mapped_column(default=0)
+    pending_frame_index: Mapped[int | None] = mapped_column(nullable=True)
+    last_sent_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    retry_count: Mapped[int] = mapped_column(default=0)
+    correlation_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    ack_deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    parse_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dispatched_entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dispatched_entity_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AnalyzerTransportFrameLogRecord(Base):
+    __tablename__ = "analyzer_transport_frame_log_runtime"
+    __table_args__ = (
+        Index("ix_transport_frame_runtime_session", "session_id", "created_at"),
+        Index("ix_transport_frame_runtime_message", "message_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("analyzer_transport_session_runtime.id"))
+    message_id: Mapped[str | None] = mapped_column(
+        ForeignKey("analyzer_transport_message_runtime.id"),
+        nullable=True,
+    )
+    direction: Mapped[str] = mapped_column(String(16))
+    event_kind: Mapped[str] = mapped_column(String(16))
+    control_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    frame_no: Mapped[int | None] = mapped_column(nullable=True)
+    payload_chunk: Mapped[str | None] = mapped_column(Text, nullable=True)
+    framed_payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+    checksum_hex: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    is_final: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    accepted: Mapped[bool] = mapped_column(Boolean, default=True)
+    duplicate_flag: Mapped[bool] = mapped_column(Boolean, default=False)
+    retry_no: Mapped[int] = mapped_column(default=0)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class OrderRecord(Base):
     __tablename__ = "lis_order_runtime"
     __table_args__ = (

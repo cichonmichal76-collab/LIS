@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 APP_NAME = "LIS Core API"
-APP_VERSION = "0.7.1"
+APP_VERSION = "0.11.0"
 
 
 def _default_database_url() -> str:

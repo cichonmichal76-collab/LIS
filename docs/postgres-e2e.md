@@ -62,6 +62,12 @@ The `api` service executes:
 2. `python scripts/migrate.py`
 3. `uvicorn app.main:app --host 0.0.0.0 --port 8000`
 
+The `analyzer-runtime` service executes:
+
+1. `python scripts/wait_for_db.py`
+2. `python scripts/migrate.py`
+3. `python scripts/analyzer_runtime.py`
+
 ## What to verify after startup
 
 - `GET /health`
@@ -71,19 +77,24 @@ The `api` service executes:
 
 ## Current repository result
 
-The PostgreSQL E2E path has been validated on a live PostgreSQL container through:
+The PostgreSQL E2E path is part of the supported project workflow and was previously validated
+on a live PostgreSQL container through:
 
 ```powershell
 docker compose run --rm test-runner
 ```
 
-Result:
+Previously confirmed baseline result:
 
 - `pytest -q` -> `14 passed`
 - `smoke_test_matrix.py` -> OK
+
+For the v11 QC and advanced autoverification step on 2026-04-23, a re-run was attempted in this environment, but it could
+not start because the Docker daemon was unavailable.
 
 ## Known boundary
 
 - the runtime app still bootstraps its current operational schema through SQLAlchemy metadata
 - checked-in SQL migrations remain important project artifacts, but they are not yet the sole runtime migration mechanism
-- this flow does not yet cover QC, advanced delta checks, or full analyzer transport with ACK/retry/framing
+- the current local smoke matrix now covers QC as well, but that updated matrix was not re-run here on live PostgreSQL because Docker was unavailable
+- real analyzer runtime validation still depends on environment-specific TCP/serial access

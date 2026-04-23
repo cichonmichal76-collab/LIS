@@ -23,6 +23,8 @@ class DatabaseSessionManager:
         )
 
     def create_schema(self) -> None:
+        from app.db import models as _models  # noqa: F401
+
         Base.metadata.create_all(self.engine)
 
     def dispose(self) -> None:

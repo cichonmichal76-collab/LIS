@@ -138,6 +138,87 @@ create table test_catalog_member (
     unique (parent_test_catalog_id, child_test_catalog_id)
 );
 
+create table qc_material (
+    id uuid primary key default gen_random_uuid(),
+    code text not null unique,
+    name text not null,
+    manufacturer text null,
+    active boolean not null default true,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create table qc_lot (
+    id uuid primary key default gen_random_uuid(),
+    material_id uuid not null references qc_material(id),
+    lot_no text not null,
+    test_catalog_id uuid not null references test_catalog(id),
+    device_id uuid null references device(id),
+    unit_ucum text null,
+    target_mean numeric null,
+    target_sd numeric null,
+    min_value numeric null,
+    max_value numeric null,
+    active boolean not null default true,
+    expires_at timestamptz null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create index idx_qc_lot_scope on qc_lot(test_catalog_id, device_id, active);
+create index idx_qc_lot_material on qc_lot(material_id, lot_no);
+
+create table qc_rule (
+    id uuid primary key default gen_random_uuid(),
+    name text not null,
+    active boolean not null default true,
+    priority int not null default 100,
+    test_catalog_id uuid null references test_catalog(id),
+    device_id uuid null references device(id),
+    rule_type text not null check (rule_type in ('range','westgard_12s','westgard_13s','westgard_22s')),
+    params_json jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create index idx_qc_rule_scope on qc_rule(test_catalog_id, device_id, active);
+
+create table qc_run (
+    id uuid primary key default gen_random_uuid(),
+    lot_id uuid not null references qc_lot(id),
+    device_id uuid null references device(id),
+    status text not null check (status in ('open','passed','warning','failed')),
+    started_at timestamptz not null default now(),
+    evaluated_at timestamptz null,
+    reviewed_by_user_id uuid null references app_user(id),
+    summary_json jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create index idx_qc_run_lot_status on qc_run(lot_id, status, created_at desc);
+create index idx_qc_run_device_status on qc_run(device_id, status, created_at desc);
+
+create table qc_result (
+    id uuid primary key default gen_random_uuid(),
+    run_id uuid not null references qc_run(id) on delete cascade,
+    test_catalog_id uuid not null references test_catalog(id),
+    value_num numeric not null,
+    unit_ucum text null,
+    decision text null check (decision in ('pass','warning','fail')),
+    z_score numeric null,
+    warning_rules_json jsonb not null default '[]'::jsonb,
+    failure_rules_json jsonb not null default '[]'::jsonb,
+    observed_at timestamptz null,
+    evaluated_at timestamptz null,
+    raw_message_id uuid null references raw_instrument_message(id),
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create index idx_qc_result_run on qc_result(run_id, created_at desc);
+create index idx_qc_result_test_eval on qc_result(test_catalog_id, evaluated_at desc);
+
 create table reference_interval (
     id uuid primary key default gen_random_uuid(),
     test_catalog_id uuid not null references test_catalog(id),
@@ -402,6 +483,99 @@ create table autoverification_run (
 
 create index idx_autoverification_rule_scope on autoverification_rule(test_catalog_id, device_id, specimen_type_code, active);
 create index idx_autoverification_run_observation on autoverification_run(observation_id, evaluated_at desc);
+
+create table analyzer_transport_profile (
+    id uuid primary key default gen_random_uuid(),
+    device_id uuid not null references device(id) on delete cascade,
+    protocol text not null check (protocol in ('astm-transport')),
+    framing_mode text not null check (framing_mode in ('astm-e1381')),
+    connection_mode text not null default 'mock' check (connection_mode in ('mock','tcp-client','serial')),
+    tcp_host text null,
+    tcp_port int null,
+    serial_port text null,
+    serial_baudrate int null,
+    frame_payload_size int not null,
+    ack_timeout_seconds int not null,
+    max_retries int not null,
+    poll_interval_seconds int not null default 1,
+    read_timeout_seconds int not null default 1,
+    write_timeout_seconds int not null default 5,
+    auto_dispatch_astm boolean not null default true,
+    auto_verify boolean not null default false,
+    active boolean not null default true,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create table analyzer_transport_session (
+    id uuid primary key default gen_random_uuid(),
+    device_id uuid not null references device(id) on delete cascade,
+    profile_id uuid not null references analyzer_transport_profile(id),
+    session_status text not null check (
+        session_status in ('idle','sending','receiving','awaiting_ack','closed','error')
+    ),
+    outbound_message_id uuid null,
+    inbound_message_id uuid null,
+    expected_inbound_frame_no int not null default 1,
+    last_error text null,
+    last_activity_at timestamptz not null default now(),
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    closed_at timestamptz null
+);
+
+create table analyzer_transport_message (
+    id uuid primary key default gen_random_uuid(),
+    session_id uuid not null references analyzer_transport_session(id) on delete cascade,
+    device_id uuid not null references device(id) on delete cascade,
+    direction text not null check (direction in ('inbound','outbound')),
+    protocol text not null,
+    message_type text not null,
+    transport_status text not null check (
+        transport_status in ('queued','ready','awaiting_ack','resend','completed','failed','receiving','received','dispatched')
+    ),
+    logical_payload text not null,
+    assembled_payload text null,
+    frames_json jsonb not null default '[]'::jsonb,
+    total_frames int not null default 0,
+    next_frame_index int not null default 0,
+    pending_frame_index int null,
+    last_sent_kind text null check (last_sent_kind in ('ENQ','FRAME','EOT')),
+    retry_count int not null default 0,
+    correlation_key text null,
+    ack_deadline_at timestamptz null,
+    parse_error text null,
+    dispatched_entity_type text null,
+    dispatched_entity_id uuid null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    completed_at timestamptz null
+);
+
+create table analyzer_transport_frame_log (
+    id uuid primary key default gen_random_uuid(),
+    session_id uuid not null references analyzer_transport_session(id) on delete cascade,
+    message_id uuid null references analyzer_transport_message(id) on delete cascade,
+    direction text not null check (direction in ('inbound','outbound')),
+    event_kind text not null check (event_kind in ('control','frame')),
+    control_code text null,
+    frame_no int null,
+    payload_chunk text null,
+    framed_payload text null,
+    checksum_hex text null,
+    is_final boolean null,
+    accepted boolean not null default true,
+    duplicate_flag boolean not null default false,
+    retry_no int not null default 0,
+    notes text null,
+    created_at timestamptz not null default now()
+);
+
+create index idx_transport_profile_device on analyzer_transport_profile(device_id, active);
+create index idx_transport_session_device on analyzer_transport_session(device_id, created_at);
+create index idx_transport_message_session on analyzer_transport_message(session_id, direction, transport_status, created_at);
+create index idx_transport_frame_session on analyzer_transport_frame_log(session_id, created_at);
+create index idx_transport_frame_message on analyzer_transport_frame_log(message_id, created_at);
 
 create table diagnostic_report (
     id uuid primary key default gen_random_uuid(),
