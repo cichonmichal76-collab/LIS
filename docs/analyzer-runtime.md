@@ -1,6 +1,6 @@
 # Analyzer Runtime
 
-Ten dokument opisuje v9-v12, czyli osobny runtime analizatorow dzialajacy poza request lifecycle API
+Ten dokument opisuje v9-v14, czyli osobny runtime analizatorow dzialajacy poza request lifecycle API
 oraz jego pozniejsze utwardzenie operacyjne.
 
 ## Po co ten etap
@@ -151,6 +151,17 @@ Endpoint `/api/v1/analyzer-transport/runtime/overview` pokazuje aktualny stan ru
 - liczbe sesji w backoff,
 - liczbe sesji w stanie `error`.
 
+## Co dochodzi w v14
+
+V14 doklada warstwe odzyskiwania i obserwowalnosci runtime bez potrzeby podpinania sprzetu.
+
+Dochodzi:
+
+- reczne `dead-letter` i `requeue` dla wiadomosci transportowych,
+- runtime metrics API pod `/api/v1/analyzer-transport/runtime/metrics`,
+- prosty recovery flow po nieudanych probach transportowych,
+- smoke i testy dla scenariusza `NAK -> failed -> dead_letter -> requeue`.
+
 ## Testy i smoke
 
 Ten etap ma osobne potwierdzenie dzialania:
@@ -167,6 +178,8 @@ Testy obejmuja:
 - respektowanie aktywnego lease i przejecie lease wygaslego
 - backoff po bledzie runtime
 - runtime overview z licznikami lease/backoff/error
+- runtime metrics z licznikami statusow wiadomosci
+- odzyskanie outbound message przez `dead_letter` i `requeue`
 
 ## Docker Compose
 
@@ -189,10 +202,11 @@ To nadal nie jest pelny, produkcyjny driver analizatora.
 Brakuje jeszcze:
 
 - lepszej rekoneksji i recovery po rozlaczeniach,
-- bardziej rozbudowanego replay/dead-letter flow,
+- automatycznego replay policy engine i dead-letter queue processor,
 - potwierdzonej sciezki `pyserial`,
 - bogatszej obslugi framingu i site-specific wariantow protokolow,
-- eksportu metrics i stalego monitoringu runtime.
+- eksportu metrics do zewnetrznego monitoringu i stalego observability stacku.
 
-Najuczciwiej: v12 daje dzialajacy background worker z leasingiem, backoff i overview API,
+Najuczciwiej: v14 daje dzialajacy background worker z leasingiem, backoff,
+overview API, runtime metrics i podstawowym recovery flow,
 ale nie jest jeszcze finalnym, produkcyjnym middleware analyzerowym.

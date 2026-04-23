@@ -133,7 +133,7 @@ def main() -> None:
                 "device_id": device_id,
                 "frame_payload_size": 256,
                 "ack_timeout_seconds": 10,
-                "max_retries": 2,
+                "max_retries": 1,
             },
         )
         assert profile.status_code == 201, profile.text
@@ -183,6 +183,70 @@ def main() -> None:
             headers=headers,
         ).status_code == 200
 
+        failed_session = client.post(
+            "/api/v1/analyzer-transport/sessions",
+            headers=headers,
+            json={"device_id": device_id},
+        )
+        assert failed_session.status_code == 201, failed_session.text
+        failed_session_id = failed_session.json()["id"]
+
+        failed_message = client.post(
+            f"/api/v1/analyzer-transport/sessions/{failed_session_id}/queue-outbound",
+            headers=headers,
+            json={
+                "message_type": "ASTM-WORKLIST",
+                "logical_payload": r"H|\^&|||ASTM-SMOKE-TX|||||P|1\rL|1|N\r",
+            },
+        )
+        assert failed_message.status_code == 201, failed_message.text
+        failed_message_id = failed_message.json()["id"]
+
+        assert client.post(
+            f"/api/v1/analyzer-transport/sessions/{failed_session_id}/outbound/next",
+            headers=headers,
+        ).status_code == 200
+        assert client.post(
+            f"/api/v1/analyzer-transport/sessions/{failed_session_id}/outbound/ack",
+            headers=headers,
+        ).status_code == 200
+        assert client.post(
+            f"/api/v1/analyzer-transport/sessions/{failed_session_id}/outbound/next",
+            headers=headers,
+        ).status_code == 200
+        first_nak = client.post(
+            f"/api/v1/analyzer-transport/sessions/{failed_session_id}/outbound/nak",
+            headers=headers,
+        )
+        assert first_nak.status_code == 200, first_nak.text
+        assert first_nak.json()["decision"] == "resend"
+        assert client.post(
+            f"/api/v1/analyzer-transport/sessions/{failed_session_id}/outbound/next",
+            headers=headers,
+        ).status_code == 200
+        failed = client.post(
+            f"/api/v1/analyzer-transport/sessions/{failed_session_id}/outbound/nak",
+            headers=headers,
+        )
+        assert failed.status_code == 200, failed.text
+        assert failed.json()["decision"] == "failed"
+
+        dead_letter = client.post(
+            f"/api/v1/analyzer-transport/messages/{failed_message_id}/dead-letter",
+            headers=headers,
+            json={"notes": "smoke-dead-letter"},
+        )
+        assert dead_letter.status_code == 200, dead_letter.text
+        assert dead_letter.json()["message"]["transport_status"] == "dead_letter"
+
+        requeue = client.post(
+            f"/api/v1/analyzer-transport/messages/{failed_message_id}/requeue",
+            headers=headers,
+            json={"notes": "smoke-requeue"},
+        )
+        assert requeue.status_code == 200, requeue.text
+        assert requeue.json()["message"]["transport_status"] == "queued"
+
         inbound_session = client.post(
             "/api/v1/analyzer-transport/sessions",
             headers=headers,
@@ -229,10 +293,20 @@ def main() -> None:
             json={"control_code": "EOT"},
         ).status_code == 200
 
+        metrics = client.get(
+            "/api/v1/analyzer-transport/runtime/metrics",
+            headers=headers,
+            params={"device_id": device_id},
+        )
+        assert metrics.status_code == 200, metrics.text
+        assert metrics.json()["message_count"] >= 3
+        assert metrics.json()["queued_outbound_count"] >= 1
+
         print("Analyzer transport smoke OK")
         print(
             {
                 "worklist_session_id": session_id,
+                "failed_session_id": failed_session_id,
                 "inbound_session_id": inbound_session_id,
                 "device_id": device_id,
             }

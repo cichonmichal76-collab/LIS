@@ -46,6 +46,7 @@ class AnalyzerTransportMessageStatus(str, Enum):
     RESEND = "resend"
     COMPLETED = "completed"
     FAILED = "failed"
+    DEAD_LETTER = "dead_letter"
     RECEIVING = "receiving"
     RECEIVED = "received"
     DISPATCHED = "dispatched"
@@ -206,6 +207,10 @@ class AnalyzerTransportDispatchASTMRequest(ApiModel):
     auto_verify: bool = False
 
 
+class AnalyzerTransportMessageActionRequest(ApiModel):
+    notes: str | None = None
+
+
 class AnalyzerTransportItem(ApiModel):
     kind: str
     control_code: str | None = None
@@ -269,6 +274,12 @@ class AnalyzerTransportInboundFrameResponse(ApiModel):
     dispatch: ASTMImportResponse | None = None
 
 
+class AnalyzerTransportMessageActionResponse(ApiModel):
+    action: str
+    session: AnalyzerTransportSessionSummary
+    message: AnalyzerTransportMessageSummary
+
+
 class AnalyzerTransportListProfilesResponse(ApiModel):
     items: list[AnalyzerTransportProfileSummary] = Field(default_factory=list)
 
@@ -293,6 +304,29 @@ class AnalyzerTransportRuntimeOverview(ApiModel):
     backoff_session_count: int
     error_session_count: int
     items: list[AnalyzerTransportSessionSummary] = Field(default_factory=list)
+
+
+class AnalyzerTransportRuntimeMetrics(ApiModel):
+    profile_count: int
+    session_count: int
+    message_count: int
+    leased_session_count: int
+    stale_lease_count: int
+    backoff_session_count: int
+    error_session_count: int
+    active_outbound_session_count: int
+    active_inbound_session_count: int
+    queued_outbound_count: int
+    ready_outbound_count: int
+    awaiting_ack_count: int
+    resend_count: int
+    failed_message_count: int
+    dead_letter_count: int
+    receiving_inbound_count: int
+    received_inbound_count: int
+    dispatched_count: int
+    completed_outbound_count: int
+    status_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class AnalyzerTransportDebugSnapshot(ApiModel):

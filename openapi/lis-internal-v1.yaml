@@ -6,7 +6,7 @@ info:
     specimen lifecycle, task orchestration, observations, reports, audit, provenance,
     device registry, HL7 v2 integrations, device gateway, autoverification, QC engine,
     ASTM-style drivers, analyzer transport sessions, and a read/search FHIR facade.
-  version: 0.13.0
+  version: 0.14.0
 paths:
   /health:
     get:
@@ -954,6 +954,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/analyzer-transport/runtime/metrics:
+    get:
+      tags:
+      - analyzer-transport
+      summary: Get Runtime Metrics
+      operationId: get_runtime_metrics_api_v1_analyzer_transport_runtime_metrics_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: device_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzerTransportRuntimeMetrics'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/analyzer-transport/sessions/{session_id}:
     get:
       tags:
@@ -1329,6 +1360,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalyzerTransportDispatchResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/analyzer-transport/messages/{message_id}/dead-letter:
+    post:
+      tags:
+      - analyzer-transport
+      summary: Dead Letter Message
+      operationId: dead_letter_message_api_v1_analyzer_transport_messages__message_id__dead_letter_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Message Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzerTransportMessageActionRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzerTransportMessageActionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/analyzer-transport/messages/{message_id}/requeue:
+    post:
+      tags:
+      - analyzer-transport
+      summary: Requeue Message
+      operationId: requeue_message_api_v1_analyzer_transport_messages__message_id__requeue_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Message Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzerTransportMessageActionRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzerTransportMessageActionResponse'
         '422':
           description: Validation Error
           content:
@@ -4296,6 +4397,32 @@ components:
       additionalProperties: false
       type: object
       title: AnalyzerTransportListSessionsResponse
+    AnalyzerTransportMessageActionRequest:
+      properties:
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+      additionalProperties: false
+      type: object
+      title: AnalyzerTransportMessageActionRequest
+    AnalyzerTransportMessageActionResponse:
+      properties:
+        action:
+          type: string
+          title: Action
+        session:
+          $ref: '#/components/schemas/AnalyzerTransportSessionSummary'
+        message:
+          $ref: '#/components/schemas/AnalyzerTransportMessageSummary'
+      additionalProperties: false
+      type: object
+      required:
+      - action
+      - session
+      - message
+      title: AnalyzerTransportMessageActionResponse
     AnalyzerTransportMessageStatus:
       type: string
       enum:
@@ -4305,6 +4432,7 @@ components:
       - resend
       - completed
       - failed
+      - dead_letter
       - receiving
       - received
       - dispatched
@@ -4708,6 +4836,93 @@ components:
       required:
       - framed_payload
       title: AnalyzerTransportReceiveFrameRequest
+    AnalyzerTransportRuntimeMetrics:
+      properties:
+        profile_count:
+          type: integer
+          title: Profile Count
+        session_count:
+          type: integer
+          title: Session Count
+        message_count:
+          type: integer
+          title: Message Count
+        leased_session_count:
+          type: integer
+          title: Leased Session Count
+        stale_lease_count:
+          type: integer
+          title: Stale Lease Count
+        backoff_session_count:
+          type: integer
+          title: Backoff Session Count
+        error_session_count:
+          type: integer
+          title: Error Session Count
+        active_outbound_session_count:
+          type: integer
+          title: Active Outbound Session Count
+        active_inbound_session_count:
+          type: integer
+          title: Active Inbound Session Count
+        queued_outbound_count:
+          type: integer
+          title: Queued Outbound Count
+        ready_outbound_count:
+          type: integer
+          title: Ready Outbound Count
+        awaiting_ack_count:
+          type: integer
+          title: Awaiting Ack Count
+        resend_count:
+          type: integer
+          title: Resend Count
+        failed_message_count:
+          type: integer
+          title: Failed Message Count
+        dead_letter_count:
+          type: integer
+          title: Dead Letter Count
+        receiving_inbound_count:
+          type: integer
+          title: Receiving Inbound Count
+        received_inbound_count:
+          type: integer
+          title: Received Inbound Count
+        dispatched_count:
+          type: integer
+          title: Dispatched Count
+        completed_outbound_count:
+          type: integer
+          title: Completed Outbound Count
+        status_counts:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Status Counts
+      additionalProperties: false
+      type: object
+      required:
+      - profile_count
+      - session_count
+      - message_count
+      - leased_session_count
+      - stale_lease_count
+      - backoff_session_count
+      - error_session_count
+      - active_outbound_session_count
+      - active_inbound_session_count
+      - queued_outbound_count
+      - ready_outbound_count
+      - awaiting_ack_count
+      - resend_count
+      - failed_message_count
+      - dead_letter_count
+      - receiving_inbound_count
+      - received_inbound_count
+      - dispatched_count
+      - completed_outbound_count
+      title: AnalyzerTransportRuntimeMetrics
     AnalyzerTransportRuntimeOverview:
       properties:
         profile_count:

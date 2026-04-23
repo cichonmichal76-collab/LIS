@@ -128,6 +128,7 @@ This repo now includes a working persistence slice for:
   `ENQ`/`ACK`/`NAK`/`EOT`, retry handling, frame logs, and dispatch into ASTM import,
 - analyzer runtime worker with `mock`, `tcp-client`, and `serial` connector modes,
   lease ownership, retry backoff, runtime overview API,
+  dead-letter and requeue controls for transport messages, and runtime metrics export,
   and a dedicated Docker Compose service for background transport processing,
 - runtime bootstrap SQL generated from ORM metadata and used by `scripts/migrate.py`,
 - SQLite and PostgreSQL CI coverage through GitHub Actions,
@@ -172,13 +173,13 @@ The target design extends that baseline to:
 
 - deeper PostgreSQL-first alignment with canonical target tables,
 - vendor-specific device drivers and richer interface protocols,
-- richer connection recovery, deeper replay/dead-letter handling, and production hardening for the analyzer runtime,
+- richer connection recovery, replay automation, and production hardening for the analyzer runtime,
 - deeper QC coverage such as richer Westgard/trend rules and operational QC scheduling,
 - richer FHIR interoperability such as write interactions, subscriptions, and profiles.
 
 ## Suggested next milestones
 
-1. Add deeper replay/dead-letter handling, reconnect policies, and runtime metrics export.
+1. Add automated replay policies, quarantine workflows, and richer runtime observability/metrics sinks.
 2. Add multi-level QC, richer trend rules, and deeper clinical/autoverification context.
 3. Add richer user and practitioner linkage beyond starter RBAC.
 4. Add richer FHIR features such as writes, subscriptions, and profile validation.

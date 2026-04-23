@@ -320,3 +320,199 @@ def test_analyzer_transport_inbound_duplicate_and_dispatch(tmp_path):
         assert frames.status_code == 200, frames.text
         duplicates = [row for row in frames.json()["items"] if row["duplicate_flag"] is True]
         assert len(duplicates) == 1
+
+
+def test_analyzer_transport_dead_letter_and_requeue_failed_outbound(tmp_path):
+    with make_client(tmp_path, "lis-transport-dead-letter.sqlite3") as client:
+        headers, _ = bootstrap_admin(client)
+
+        device = client.post(
+            "/api/v1/devices",
+            headers=headers,
+            json={
+                "code": "ASTM-TX-DLQ-01",
+                "display_name": "Transport dead-letter analyzer",
+                "protocol": "astm",
+            },
+        )
+        assert device.status_code == 201, device.text
+        device_id = device.json()["id"]
+
+        profile = client.post(
+            "/api/v1/analyzer-transport/profiles",
+            headers=headers,
+            json={
+                "device_id": device_id,
+                "frame_payload_size": 64,
+                "ack_timeout_seconds": 10,
+                "max_retries": 1,
+            },
+        )
+        assert profile.status_code == 201, profile.text
+
+        transport_session = client.post(
+            "/api/v1/analyzer-transport/sessions",
+            headers=headers,
+            json={"device_id": device_id},
+        )
+        assert transport_session.status_code == 201, transport_session.text
+        session_id = transport_session.json()["id"]
+
+        queued = client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/queue-outbound",
+            headers=headers,
+            json={
+                "message_type": "ASTM-WORKLIST",
+                "logical_payload": r"H|\^&|||ASTM-TX-DLQ-01|||||P|1\rL|1|N\r",
+            },
+        )
+        assert queued.status_code == 201, queued.text
+        message_id = queued.json()["id"]
+
+        assert client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/outbound/next",
+            headers=headers,
+        ).status_code == 200
+        assert client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/outbound/ack",
+            headers=headers,
+        ).status_code == 200
+
+        first_frame = client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/outbound/next",
+            headers=headers,
+        )
+        assert first_frame.status_code == 200, first_frame.text
+        assert first_frame.json()["transport_item"]["kind"] == "frame"
+
+        first_nak = client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/outbound/nak",
+            headers=headers,
+        )
+        assert first_nak.status_code == 200, first_nak.text
+        assert first_nak.json()["decision"] == "resend"
+
+        resend = client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/outbound/next",
+            headers=headers,
+        )
+        assert resend.status_code == 200, resend.text
+        assert resend.json()["transport_item"]["kind"] == "frame"
+
+        second_nak = client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/outbound/nak",
+            headers=headers,
+        )
+        assert second_nak.status_code == 200, second_nak.text
+        assert second_nak.json()["decision"] == "failed"
+        assert second_nak.json()["message"]["transport_status"] == "failed"
+        assert second_nak.json()["session"]["session_status"] == "error"
+
+        dead_letter = client.post(
+            f"/api/v1/analyzer-transport/messages/{message_id}/dead-letter",
+            headers=headers,
+            json={"notes": "operator-dead-letter"},
+        )
+        assert dead_letter.status_code == 200, dead_letter.text
+        assert dead_letter.json()["message"]["transport_status"] == "dead_letter"
+        assert dead_letter.json()["session"]["session_status"] == "idle"
+
+        requeue = client.post(
+            f"/api/v1/analyzer-transport/messages/{message_id}/requeue",
+            headers=headers,
+            json={"notes": "operator-requeue"},
+        )
+        assert requeue.status_code == 200, requeue.text
+        assert requeue.json()["message"]["transport_status"] == "queued"
+        assert requeue.json()["message"]["retry_count"] == 0
+        assert requeue.json()["message"]["next_frame_index"] == 0
+        assert requeue.json()["session"]["session_status"] == "sending"
+
+
+def test_analyzer_transport_runtime_metrics_include_dead_letter(tmp_path):
+    with make_client(tmp_path, "lis-transport-metrics.sqlite3") as client:
+        headers, _ = bootstrap_admin(client)
+
+        device = client.post(
+            "/api/v1/devices",
+            headers=headers,
+            json={
+                "code": "ASTM-TX-METRICS-01",
+                "display_name": "Transport metrics analyzer",
+                "protocol": "astm",
+            },
+        )
+        assert device.status_code == 201, device.text
+        device_id = device.json()["id"]
+
+        profile = client.post(
+            "/api/v1/analyzer-transport/profiles",
+            headers=headers,
+            json={
+                "device_id": device_id,
+                "frame_payload_size": 64,
+                "ack_timeout_seconds": 10,
+                "max_retries": 0,
+            },
+        )
+        assert profile.status_code == 201, profile.text
+
+        transport_session = client.post(
+            "/api/v1/analyzer-transport/sessions",
+            headers=headers,
+            json={"device_id": device_id},
+        )
+        assert transport_session.status_code == 201, transport_session.text
+        session_id = transport_session.json()["id"]
+
+        queued = client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/queue-outbound",
+            headers=headers,
+            json={
+                "message_type": "ASTM-WORKLIST",
+                "logical_payload": r"H|\^&|||ASTM-TX-METRICS-01|||||P|1\rL|1|N\r",
+            },
+        )
+        assert queued.status_code == 201, queued.text
+        message_id = queued.json()["id"]
+
+        assert client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/outbound/next",
+            headers=headers,
+        ).status_code == 200
+        assert client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/outbound/ack",
+            headers=headers,
+        ).status_code == 200
+        assert client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/outbound/next",
+            headers=headers,
+        ).status_code == 200
+
+        failed = client.post(
+            f"/api/v1/analyzer-transport/sessions/{session_id}/outbound/nak",
+            headers=headers,
+        )
+        assert failed.status_code == 200, failed.text
+        assert failed.json()["decision"] == "failed"
+
+        dead_letter = client.post(
+            f"/api/v1/analyzer-transport/messages/{message_id}/dead-letter",
+            headers=headers,
+            json={"notes": "metrics-dead-letter"},
+        )
+        assert dead_letter.status_code == 200, dead_letter.text
+
+        metrics = client.get(
+            "/api/v1/analyzer-transport/runtime/metrics",
+            headers=headers,
+            params={"device_id": device_id},
+        )
+        assert metrics.status_code == 200, metrics.text
+        payload = metrics.json()
+        assert payload["profile_count"] == 1
+        assert payload["session_count"] == 1
+        assert payload["message_count"] == 1
+        assert payload["dead_letter_count"] == 1
+        assert payload["failed_message_count"] == 0
+        assert payload["status_counts"]["dead_letter"] == 1

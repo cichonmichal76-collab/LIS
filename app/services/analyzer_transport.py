@@ -34,6 +34,7 @@ from app.schemas.analyzer_transport import (
     AnalyzerTransportListMessagesResponse,
     AnalyzerTransportListProfilesResponse,
     AnalyzerTransportListSessionsResponse,
+    AnalyzerTransportMessageActionResponse,
     AnalyzerTransportMessageStatus,
     AnalyzerTransportMessageSummary,
     AnalyzerTransportNextOutboundResponse,
@@ -44,6 +45,7 @@ from app.schemas.analyzer_transport import (
     AnalyzerTransportQueueOutboundRequest,
     AnalyzerTransportReceiveControlRequest,
     AnalyzerTransportReceiveFrameRequest,
+    AnalyzerTransportRuntimeMetrics,
     AnalyzerTransportRuntimeOverview,
     AnalyzerTransportSessionCreateRequest,
     AnalyzerTransportSessionStatus,
@@ -331,6 +333,83 @@ def get_runtime_overview(
         backoff_session_count=backoff_session_count,
         error_session_count=error_session_count,
         items=[_to_session_summary(item) for item in sessions],
+    )
+
+
+def get_runtime_metrics(
+    session: Session,
+    *,
+    device_id: UUID | None = None,
+) -> AnalyzerTransportRuntimeMetrics:
+    profile_stmt: Select[tuple[AnalyzerTransportProfileRecord]] = select(
+        AnalyzerTransportProfileRecord
+    )
+    session_stmt: Select[tuple[AnalyzerTransportSessionRecord]] = select(
+        AnalyzerTransportSessionRecord
+    )
+    message_stmt: Select[tuple[AnalyzerTransportMessageRecord]] = select(
+        AnalyzerTransportMessageRecord
+    )
+    if device_id is not None:
+        device_id_str = str(device_id)
+        profile_stmt = profile_stmt.where(AnalyzerTransportProfileRecord.device_id == device_id_str)
+        session_stmt = session_stmt.where(AnalyzerTransportSessionRecord.device_id == device_id_str)
+        message_stmt = message_stmt.where(AnalyzerTransportMessageRecord.device_id == device_id_str)
+
+    profiles = session.scalars(profile_stmt).all()
+    sessions = session.scalars(session_stmt).all()
+    messages = session.scalars(message_stmt).all()
+    now = datetime.now(UTC)
+
+    leased_session_count = sum(
+        1
+        for item in sessions
+        if item.lease_owner is not None
+        and _as_utc(item.lease_expires_at) is not None
+        and _as_utc(item.lease_expires_at) > now
+    )
+    stale_lease_count = sum(
+        1
+        for item in sessions
+        if item.lease_owner is not None
+        and _as_utc(item.lease_expires_at) is not None
+        and _as_utc(item.lease_expires_at) <= now
+    )
+    backoff_session_count = sum(
+        1
+        for item in sessions
+        if _as_utc(item.next_retry_at) is not None and _as_utc(item.next_retry_at) > now
+    )
+    error_session_count = sum(1 for item in sessions if item.session_status == "error")
+    active_outbound_session_count = sum(1 for item in sessions if item.outbound_message_id is not None)
+    active_inbound_session_count = sum(1 for item in sessions if item.inbound_message_id is not None)
+
+    status_counts: dict[str, int] = {}
+    for message in messages:
+        status_key = message.transport_status
+        status_counts[status_key] = status_counts.get(status_key, 0) + 1
+
+    return AnalyzerTransportRuntimeMetrics(
+        profile_count=len(profiles),
+        session_count=len(sessions),
+        message_count=len(messages),
+        leased_session_count=leased_session_count,
+        stale_lease_count=stale_lease_count,
+        backoff_session_count=backoff_session_count,
+        error_session_count=error_session_count,
+        active_outbound_session_count=active_outbound_session_count,
+        active_inbound_session_count=active_inbound_session_count,
+        queued_outbound_count=status_counts.get(AnalyzerTransportMessageStatus.QUEUED.value, 0),
+        ready_outbound_count=status_counts.get(AnalyzerTransportMessageStatus.READY.value, 0),
+        awaiting_ack_count=status_counts.get(AnalyzerTransportMessageStatus.AWAITING_ACK.value, 0),
+        resend_count=status_counts.get(AnalyzerTransportMessageStatus.RESEND.value, 0),
+        failed_message_count=status_counts.get(AnalyzerTransportMessageStatus.FAILED.value, 0),
+        dead_letter_count=status_counts.get(AnalyzerTransportMessageStatus.DEAD_LETTER.value, 0),
+        receiving_inbound_count=status_counts.get(AnalyzerTransportMessageStatus.RECEIVING.value, 0),
+        received_inbound_count=status_counts.get(AnalyzerTransportMessageStatus.RECEIVED.value, 0),
+        dispatched_count=status_counts.get(AnalyzerTransportMessageStatus.DISPATCHED.value, 0),
+        completed_outbound_count=status_counts.get(AnalyzerTransportMessageStatus.COMPLETED.value, 0),
+        status_counts=status_counts,
     )
 
 
@@ -1124,6 +1203,181 @@ def dispatch_astm_message(
     )
 
 
+def dead_letter_message(
+    session: Session,
+    *,
+    message_id: UUID,
+    actor: UserSummary | None = None,
+    notes: str | None = None,
+) -> AnalyzerTransportMessageActionResponse:
+    message = _get_transport_message_or_404(session, message_id)
+    transport_session = _get_transport_session_or_404(session, UUID(message.session_id))
+    if message.transport_status in {
+        AnalyzerTransportMessageStatus.COMPLETED.value,
+        AnalyzerTransportMessageStatus.DISPATCHED.value,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Completed or dispatched transport messages cannot be dead-lettered.",
+        )
+    if message.transport_status == AnalyzerTransportMessageStatus.DEAD_LETTER.value:
+        return AnalyzerTransportMessageActionResponse(
+            action="dead_letter",
+            session=_to_session_summary(transport_session),
+            message=_to_message_summary(message),
+        )
+
+    message.transport_status = AnalyzerTransportMessageStatus.DEAD_LETTER.value
+    message.ack_deadline_at = None
+    message.pending_frame_index = None
+    message.last_sent_kind = None
+    message.completed_at = message.completed_at or datetime.now(UTC)
+    message.parse_error = _merge_transport_error(message.parse_error, notes)
+
+    if transport_session.outbound_message_id == message.id:
+        _touch_transport_session(
+            transport_session,
+            session_status=_derive_session_status(
+                transport_session,
+                outbound_message_id=None,
+                inbound_message_id=transport_session.inbound_message_id,
+            ),
+            outbound_message_id=None,
+            last_error=notes or message.parse_error or "dead-lettered",
+        )
+    elif transport_session.inbound_message_id == message.id:
+        _touch_transport_session(
+            transport_session,
+            session_status=_derive_session_status(
+                transport_session,
+                outbound_message_id=transport_session.outbound_message_id,
+                inbound_message_id=None,
+            ),
+            inbound_message_id=None,
+            expected_inbound_frame_no=1,
+            last_error=notes or message.parse_error or "dead-lettered",
+        )
+    elif transport_session.outbound_message_id is None and transport_session.inbound_message_id is None:
+        _touch_transport_session(
+            transport_session,
+            session_status=AnalyzerTransportSessionStatus.IDLE,
+            last_error=notes or message.parse_error or "dead-lettered",
+        )
+
+    write_audit_event(
+        session,
+        entity_type="analyzer_transport_message",
+        entity_id=message.id,
+        action="dead-letter",
+        status=message.transport_status,
+        actor_user_id=str(actor.id) if actor else None,
+        actor_username=actor.username if actor else None,
+        actor_role_code=actor.role_code.value if actor else None,
+        context={"session_id": transport_session.id, "notes": notes},
+    )
+    session.commit()
+    session.refresh(transport_session)
+    session.refresh(message)
+    return AnalyzerTransportMessageActionResponse(
+        action="dead_letter",
+        session=_to_session_summary(transport_session),
+        message=_to_message_summary(message),
+    )
+
+
+def requeue_message(
+    session: Session,
+    *,
+    message_id: UUID,
+    actor: UserSummary | None = None,
+    notes: str | None = None,
+) -> AnalyzerTransportMessageActionResponse:
+    message = _get_transport_message_or_404(session, message_id)
+    transport_session = _get_transport_session_or_404(session, UUID(message.session_id))
+
+    if message.direction == AnalyzerTransportDirection.OUTBOUND.value:
+        if message.transport_status not in {
+            AnalyzerTransportMessageStatus.FAILED.value,
+            AnalyzerTransportMessageStatus.DEAD_LETTER.value,
+        }:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only failed or dead-letter outbound messages can be requeued.",
+            )
+
+        message.transport_status = AnalyzerTransportMessageStatus.QUEUED.value
+        message.next_frame_index = 0
+        message.pending_frame_index = None
+        message.last_sent_kind = None
+        message.retry_count = 0
+        message.ack_deadline_at = None
+        message.completed_at = None
+        message.parse_error = None
+
+        outbound_message_id = transport_session.outbound_message_id or message.id
+        _touch_transport_session(
+            transport_session,
+            session_status=_derive_session_status(
+                transport_session,
+                outbound_message_id=outbound_message_id,
+                inbound_message_id=transport_session.inbound_message_id,
+            ),
+            outbound_message_id=outbound_message_id,
+            last_error=None,
+        )
+    else:
+        if message.transport_status not in {
+            AnalyzerTransportMessageStatus.FAILED.value,
+            AnalyzerTransportMessageStatus.DEAD_LETTER.value,
+            AnalyzerTransportMessageStatus.RECEIVED.value,
+        }:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only failed, dead-letter, or received inbound messages can be requeued.",
+            )
+        if not (message.assembled_payload or message.logical_payload):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Inbound transport message has no assembled payload to replay.",
+            )
+
+        message.transport_status = AnalyzerTransportMessageStatus.RECEIVED.value
+        message.parse_error = None
+
+        if transport_session.inbound_message_id == message.id:
+            _touch_transport_session(
+                transport_session,
+                session_status=_derive_session_status(
+                    transport_session,
+                    outbound_message_id=transport_session.outbound_message_id,
+                    inbound_message_id=None,
+                ),
+                inbound_message_id=None,
+                expected_inbound_frame_no=1,
+                last_error=None,
+            )
+
+    write_audit_event(
+        session,
+        entity_type="analyzer_transport_message",
+        entity_id=message.id,
+        action="requeue",
+        status=message.transport_status,
+        actor_user_id=str(actor.id) if actor else None,
+        actor_username=actor.username if actor else None,
+        actor_role_code=actor.role_code.value if actor else None,
+        context={"session_id": transport_session.id, "notes": notes},
+    )
+    session.commit()
+    session.refresh(transport_session)
+    session.refresh(message)
+    return AnalyzerTransportMessageActionResponse(
+        action="requeue",
+        session=_to_session_summary(transport_session),
+        message=_to_message_summary(message),
+    )
+
+
 def _dispatch_astm_message(
     session: Session,
     *,
@@ -1432,7 +1686,7 @@ def _touch_transport_session(
     outbound_message_id: str | None | object = ...,
     inbound_message_id: str | None | object = ...,
     expected_inbound_frame_no: int | None = None,
-    last_error: str | None = None,
+    last_error: str | None | object = ...,
     closed_at: datetime | None | object = ...,
 ) -> None:
     if session_status is not None:
@@ -1443,7 +1697,7 @@ def _touch_transport_session(
         transport_session.inbound_message_id = inbound_message_id
     if expected_inbound_frame_no is not None:
         transport_session.expected_inbound_frame_no = expected_inbound_frame_no
-    if last_error is not None:
+    if last_error is not ...:
         transport_session.last_error = last_error
     if closed_at is not ...:
         transport_session.closed_at = closed_at
@@ -1506,6 +1760,27 @@ def _validate_transport_profile_payload(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="poll/read/write timeout values must be non-negative.",
         )
+
+
+def _derive_session_status(
+    transport_session: AnalyzerTransportSessionRecord,
+    *,
+    outbound_message_id: str | None,
+    inbound_message_id: str | None,
+) -> AnalyzerTransportSessionStatus:
+    if transport_session.closed_at is not None:
+        return AnalyzerTransportSessionStatus.CLOSED
+    if inbound_message_id is not None:
+        return AnalyzerTransportSessionStatus.RECEIVING
+    if outbound_message_id is not None:
+        return AnalyzerTransportSessionStatus.SENDING
+    return AnalyzerTransportSessionStatus.IDLE
+
+
+def _merge_transport_error(existing: str | None, extra: str | None) -> str | None:
+    if existing and extra:
+        return f"{existing}; {extra}"
+    return extra or existing
 
 
 def _get_device_or_404(session: Session, device_id: UUID) -> DeviceRecord:

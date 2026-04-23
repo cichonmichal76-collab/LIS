@@ -1,6 +1,6 @@
 # Analyzer Transport
 
-Ten dokument opisuje warstwe transportowa analizatorow dodana w etapie v8.
+Ten dokument opisuje warstwe transportowa analizatorow rozwijana w etapach v8-v14.
 
 ## Cel
 
@@ -65,6 +65,7 @@ Stany:
 - `resend`
 - `completed`
 - `failed`
+- `dead_letter`
 - `receiving`
 - `received`
 - `dispatched`
@@ -94,6 +95,36 @@ Tabela `analyzer_transport_frame_log` przechowuje wszystkie zdarzenia transporto
 - notatki diagnostyczne.
 
 To jest glowny sladowy log zachowania transportu.
+
+## Dead-letter i requeue
+
+Od v14 backend umie tez recznie odzyskiwac wiadomosci transportowe bez ingerencji w baze.
+
+### Dead-letter
+
+Operator moze przeniesc problematyczna wiadomosc do `dead_letter`, gdy:
+
+- przekroczy limit retry,
+- sesja utknie w stanie blednym,
+- inbound payload nie nadaje sie do dalszego dispatchu,
+- chcesz odlozyc wiadomosc do recznej analizy bez jej usuwania.
+
+W tym kroku backend:
+
+- zachowuje caly surowy payload i frame log,
+- nie usuwa historii retry,
+- odczepia aktywna wiadomosc od sesji,
+- przywraca sesje do stanu roboczego, jesli nie ma juz aktywnego transportu.
+
+### Requeue
+
+Operator moze ponownie wypchnac wiadomosc do kolejki:
+
+- outbound: z `failed` albo `dead_letter` z powrotem do `queued`,
+- inbound: z `failed`, `dead_letter` albo `received` do `received`, aby ponownie uruchomic dispatch.
+
+Requeue resetuje stan transportowy potrzebny do ponownej proby, ale nie usuwa
+dotychczasowego frame logu ani audit trail.
 
 ## ASTM-style framing
 
@@ -187,6 +218,20 @@ Po udanym dispatchu wiadomosc transportowa zapisuje:
 - `POST /api/v1/analyzer-transport/sessions/{id}/inbound/control`
 - `POST /api/v1/analyzer-transport/sessions/{id}/inbound/frame`
 - `POST /api/v1/analyzer-transport/messages/{message_id}/dispatch/astm`
+- `POST /api/v1/analyzer-transport/messages/{message_id}/dead-letter`
+- `POST /api/v1/analyzer-transport/messages/{message_id}/requeue`
+- `GET /api/v1/analyzer-transport/runtime/metrics`
+
+## Runtime metrics
+
+Od v14 backend eksportuje tez zagregowane metryki runtime:
+
+- liczbe profili, sesji i wiadomosci,
+- liczbe aktywnych lease i sesji w backoff,
+- liczbe aktywnych sesji inbound i outbound,
+- liczbe wiadomosci `queued`, `ready`, `awaiting_ack`, `resend`,
+  `failed`, `dead_letter`, `receiving`, `received`, `dispatched`, `completed`,
+- slownik `status_counts`, ktory nadaje sie do prostego monitoringu albo dashboardu.
 
 ## Granica tego etapu
 
@@ -195,7 +240,9 @@ To nie jest jeszcze:
 - osobny runtime utrzymujacy stale polaczenie z analizatorem,
 - listener TCP,
 - driver serial/RS-232,
-- scheduler retry dzialajacy poza lifecycle pojedynczego requestu,
-- vendor-specific low-level connector.
+- vendor-specific low-level connector,
+- automatyczny replay policy engine,
+- osobny dead-letter queue processor.
 
-Czyli: logika transportowa jest juz backendowo gotowa, ale fizyczne I/O z analizatorem nadal wymaga kolejnego etapu.
+Czyli: logika transportowa jest juz backendowo gotowa i ma podstawowy recovery flow,
+ale fizyczne I/O z analizatorem nadal wymaga kolejnego etapu.

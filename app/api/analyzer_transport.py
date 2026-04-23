@@ -16,6 +16,8 @@ from app.schemas.analyzer_transport import (
     AnalyzerTransportListMessagesResponse,
     AnalyzerTransportListProfilesResponse,
     AnalyzerTransportListSessionsResponse,
+    AnalyzerTransportMessageActionRequest,
+    AnalyzerTransportMessageActionResponse,
     AnalyzerTransportMessageSummary,
     AnalyzerTransportNextOutboundResponse,
     AnalyzerTransportProfileCreateRequest,
@@ -23,6 +25,7 @@ from app.schemas.analyzer_transport import (
     AnalyzerTransportQueueOutboundRequest,
     AnalyzerTransportReceiveControlRequest,
     AnalyzerTransportReceiveFrameRequest,
+    AnalyzerTransportRuntimeMetrics,
     AnalyzerTransportRuntimeOverview,
     AnalyzerTransportSessionCreateRequest,
     AnalyzerTransportSessionSummary,
@@ -102,6 +105,23 @@ def get_runtime_overview(
     ),
 ) -> AnalyzerTransportRuntimeOverview:
     return transport_service.get_runtime_overview(session, device_id=device_id)
+
+
+@router.get("/runtime/metrics", response_model=AnalyzerTransportRuntimeMetrics)
+def get_runtime_metrics(
+    session: DbSession,
+    device_id: UUID | None = Query(default=None),
+    current_user: UserSummary = Depends(
+        require_roles(
+            RoleCode.ADMIN,
+            RoleCode.ACCESSIONER,
+            RoleCode.TECHNICIAN,
+            RoleCode.PATHOLOGIST,
+            RoleCode.VIEWER,
+        )
+    ),
+) -> AnalyzerTransportRuntimeMetrics:
+    return transport_service.get_runtime_metrics(session, device_id=device_id)
 
 
 @router.get("/sessions/{session_id}", response_model=AnalyzerTransportSessionSummary)
@@ -307,4 +327,41 @@ def dispatch_astm(
         message_id=message_id,
         payload=payload,
         actor=current_user,
+    )
+
+
+@router.post(
+    "/messages/{message_id}/dead-letter",
+    response_model=AnalyzerTransportMessageActionResponse,
+)
+def dead_letter_message(
+    message_id: UUID,
+    payload: AnalyzerTransportMessageActionRequest,
+    session: DbSession,
+    current_user: UserSummary = Depends(
+        require_roles(RoleCode.ADMIN, RoleCode.ACCESSIONER, RoleCode.TECHNICIAN)
+    ),
+) -> AnalyzerTransportMessageActionResponse:
+    return transport_service.dead_letter_message(
+        session,
+        message_id=message_id,
+        actor=current_user,
+        notes=payload.notes,
+    )
+
+
+@router.post("/messages/{message_id}/requeue", response_model=AnalyzerTransportMessageActionResponse)
+def requeue_message(
+    message_id: UUID,
+    payload: AnalyzerTransportMessageActionRequest,
+    session: DbSession,
+    current_user: UserSummary = Depends(
+        require_roles(RoleCode.ADMIN, RoleCode.ACCESSIONER, RoleCode.TECHNICIAN)
+    ),
+) -> AnalyzerTransportMessageActionResponse:
+    return transport_service.requeue_message(
+        session,
+        message_id=message_id,
+        actor=current_user,
+        notes=payload.notes,
     )
