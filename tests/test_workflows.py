@@ -112,6 +112,14 @@ def test_specimen_lifecycle_and_trace(tmp_path):
             "accepted",
         ]
 
+        list_response = client.get(
+            "/api/v1/specimens",
+            headers=headers,
+            params={"patient_id": patient["id"], "status": "accepted"},
+        )
+        assert list_response.status_code == 200
+        assert len(list_response.json()["items"]) == 1
+
 
 def test_task_workflow_transitions(tmp_path):
     with make_client(tmp_path, "lis-tasks.sqlite3") as client:
@@ -199,3 +207,49 @@ def test_viewer_cannot_create_patient(tmp_path):
             },
         )
         assert response.status_code == 403
+
+
+def test_report_listing_returns_generated_report(tmp_path):
+    with make_client(tmp_path, "lis-report-list.sqlite3") as client:
+        headers, user = bootstrap_admin(client)
+        patient = create_patient(client, headers)
+        catalog = create_catalog_item(client, headers)
+        order = create_order(
+            client,
+            headers,
+            patient_id=patient["id"],
+            catalog_id=catalog["id"],
+        )
+
+        order_detail = client.get(f"/api/v1/orders/{order['id']}", headers=headers).json()
+        order_item_id = order_detail["items"][0]["id"]
+
+        observation_response = client.post(
+            "/api/v1/observations/manual",
+            headers=headers,
+            json={
+                "order_item_id": order_item_id,
+                "code_local": "GLU",
+                "status": "preliminary",
+                "value_type": "quantity",
+                "value_num": 105.4,
+                "unit_ucum": "mg/dL",
+            },
+        )
+        assert observation_response.status_code == 201
+
+        report_response = client.post(
+            "/api/v1/reports/generate",
+            headers=headers,
+            json={"order_id": order["id"], "conclusion_text": "Initial release"},
+        )
+        assert report_response.status_code == 201
+        report = report_response.json()
+
+        list_response = client.get(
+            "/api/v1/reports",
+            headers=headers,
+            params={"patient_id": patient["id"], "status": "preliminary"},
+        )
+        assert list_response.status_code == 200
+        assert list_response.json()["items"][0]["id"] == report["id"]

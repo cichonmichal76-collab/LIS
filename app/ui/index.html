@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LIS Core Workbench</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">LIS</div>
+          <div class="brand-copy">
+            <strong>LIS Core</strong>
+            <span>Task-oriented laboratory workbench</span>
+          </div>
+        </div>
+
+        <div class="sidebar-runtime">
+          <span id="sidebarVersion" class="sidebar-version">v-</span>
+          <span id="sidebarHealth" class="runtime-pill">Checking runtime</span>
+        </div>
+
+        <nav id="sidebarNav" class="sidebar-nav" aria-label="Primary"></nav>
+
+        <div class="sidebar-note">
+          <p class="sidebar-note-label">Market motifs</p>
+          <p>
+            Job lists, flagged results, real-time workflow tiles, barcode-driven specimen
+            flow, and drill-down operational telemetry.
+          </p>
+        </div>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <div class="topbar-copy">
+            <p id="pageSection" class="eyebrow">Command Center</p>
+            <h1 id="pageTitle">Laboratory command center</h1>
+            <p id="pageSubtitle" class="page-subtitle">
+              A configurable LIS shell that keeps queues, results, QC, and integrations in one
+              cohesive workspace.
+            </p>
+          </div>
+
+          <div class="topbar-tools">
+            <label class="search-field">
+              <span>Workspace search</span>
+              <input id="globalSearch" type="search" placeholder="Filter the current view">
+            </label>
+            <div id="topbarBadges" class="topbar-badges"></div>
+          </div>
+        </header>
+
+        <main class="workspace-main">
+          <section id="pageHero" class="page-hero"></section>
+          <div id="pageNotice" class="page-notice" hidden></div>
+          <section id="pageContent" class="page-content"></section>
+        </main>
+      </div>
+
+      <aside class="utility-rail">
+        <section class="panel session-panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-label">Session</p>
+              <h2>Access and bootstrap</h2>
+            </div>
+            <span id="sessionBadge" class="utility-badge utility-badge-neutral">Guest</span>
+          </div>
+
+          <p id="sessionInfo" class="panel-copy">
+            Sign in to unlock live worklists, result review, QC controls, and connectivity pages.
+          </p>
+
+          <form id="loginForm" class="form-stack">
+            <div class="form-grid">
+              <label>
+                <span>Username</span>
+                <input
+                  id="usernameInput"
+                  name="username"
+                  type="text"
+                  placeholder="admin"
+                  autocomplete="username"
+                  required
+                >
+              </label>
+              <label>
+                <span>Password</span>
+                <input
+                  id="passwordInput"
+                  name="password"
+                  type="password"
+                  placeholder="admin12345"
+                  autocomplete="current-password"
+                  required
+                >
+              </label>
+            </div>
+
+            <div class="button-row">
+              <button class="button button-primary" type="submit">Sign in</button>
+              <button id="logoutButton" class="button button-secondary" type="button">Sign out</button>
+            </div>
+          </form>
+
+          <p id="authMessage" class="message" role="status"></p>
+
+          <div class="divider"></div>
+
+          <form id="bootstrapForm" class="form-stack">
+            <div class="panel-header panel-header-tight">
+              <div>
+                <p class="panel-label">First run</p>
+                <h3>Create bootstrap admin</h3>
+              </div>
+            </div>
+
+            <label>
+              <span>Display name</span>
+              <input
+                id="bootstrapDisplayName"
+                name="display_name"
+                type="text"
+                value="Admin User"
+                placeholder="Admin User"
+                required
+              >
+            </label>
+            <label>
+              <span>Username</span>
+              <input
+                id="bootstrapUsername"
+                name="username"
+                type="text"
+                value="admin"
+                placeholder="admin"
+                required
+              >
+            </label>
+            <label>
+              <span>Password</span>
+              <input
+                id="bootstrapPassword"
+                name="password"
+                type="password"
+                value="admin12345"
+                placeholder="admin12345"
+                required
+              >
+            </label>
+            <button class="button button-ghost" type="submit">Create admin and sign in</button>
+          </form>
+
+          <p id="bootstrapMessage" class="message" role="status"></p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-label">Quick actions</p>
+              <h2>Command ribbon</h2>
+            </div>
+            <span id="ribbonStatus" class="panel-microcopy">View-aware shortcuts</span>
+          </div>
+          <div id="commandRibbon" class="action-stack"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-label">Operational context</p>
+              <h2>Guidance</h2>
+            </div>
+            <span class="panel-microcopy">Workflow cues</span>
+          </div>
+          <div id="contextPanel" class="context-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-label">Developer handoff</p>
+              <h2>System links</h2>
+            </div>
+            <span class="panel-microcopy">Contracts and utilities</span>
+          </div>
+          <div id="quickLinks" class="quick-links"></div>
+        </section>
+      </aside>
+    </div>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

@@ -17,6 +17,32 @@ from app.services import reports as report_service
 router = APIRouter(prefix="/api/v1", tags=["reports"])
 
 
+@router.get("/reports", response_model=dict[str, list[DiagnosticReportSummary]])
+def list_reports(
+    session: DbSession,
+    order_id: UUID | None = None,
+    patient_id: UUID | None = None,
+    status_filter: str | None = Query(default=None, alias="status"),
+    current_user: UserSummary = Depends(
+        require_roles(
+            RoleCode.ADMIN,
+            RoleCode.ACCESSIONER,
+            RoleCode.TECHNICIAN,
+            RoleCode.PATHOLOGIST,
+            RoleCode.VIEWER,
+        )
+    ),
+) -> dict[str, list[DiagnosticReportSummary]]:
+    return {
+        "items": report_service.list_reports(
+            session,
+            order_id=order_id,
+            patient_id=patient_id,
+            status_filter=status_filter,
+        )
+    }
+
+
 @router.post(
     "/reports/generate",
     response_model=DiagnosticReportSummary,

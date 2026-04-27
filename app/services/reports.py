@@ -106,6 +106,32 @@ def generate_report(
     return get_report(session, UUID(report.id))
 
 
+def list_reports(
+    session: Session,
+    *,
+    order_id: UUID | None = None,
+    patient_id: UUID | None = None,
+    status_filter: str | None = None,
+) -> list[DiagnosticReportSummary]:
+    stmt: Select[tuple[DiagnosticReportRecord]] = (
+        select(DiagnosticReportRecord)
+        .options(
+            selectinload(DiagnosticReportRecord.versions),
+            selectinload(DiagnosticReportRecord.report_observations),
+        )
+        .order_by(DiagnosticReportRecord.created_at.desc())
+    )
+
+    if order_id:
+        stmt = stmt.where(DiagnosticReportRecord.order_id == str(order_id))
+    if patient_id:
+        stmt = stmt.where(DiagnosticReportRecord.patient_id == str(patient_id))
+    if status_filter:
+        stmt = stmt.where(DiagnosticReportRecord.status == status_filter)
+
+    return [_to_report_summary(item) for item in session.scalars(stmt).all()]
+
+
 def get_report(session: Session, report_id: UUID) -> DiagnosticReportSummary:
     report = _get_report_or_404(session, report_id)
     return _to_report_summary(report)

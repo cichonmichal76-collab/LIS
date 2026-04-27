@@ -23,6 +23,28 @@ from app.schemas.specimens import (
 from app.services.audit import write_audit_event
 
 
+def list_specimens(
+    session: Session,
+    *,
+    accession_no: str | None = None,
+    order_id: UUID | None = None,
+    patient_id: UUID | None = None,
+    status_filter: str | None = None,
+) -> list[SpecimenSummary]:
+    stmt = select(SpecimenRecord).order_by(SpecimenRecord.created_at.desc())
+
+    if accession_no:
+        stmt = stmt.where(SpecimenRecord.accession_no == accession_no)
+    if order_id:
+        stmt = stmt.where(SpecimenRecord.order_id == str(order_id))
+    if patient_id:
+        stmt = stmt.where(SpecimenRecord.patient_id == str(patient_id))
+    if status_filter:
+        stmt = stmt.where(SpecimenRecord.status == status_filter)
+
+    return [_to_specimen_summary(item) for item in session.scalars(stmt).all()]
+
+
 def accession_specimen(
     session: Session,
     payload: AccessionSpecimenRequest,
